@@ -21,5 +21,16 @@ export default {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     'linebreak-style': ['error', 'unix'],
+    "@typescript-eslint/no-unused-vars": [
+                1,
+                {
+                    argsIgnorePattern: "^_",
+                    varsIgnorePattern: "^_",
+                    ignoreRestSiblings: true
+                }
+            ],
+    "@stylistic/ts/quotes": ["error", "double", { "allowTemplateLiterals": true }],
+    "no-console": "error",
+    "semi": ["error", "always"],
   },
 };

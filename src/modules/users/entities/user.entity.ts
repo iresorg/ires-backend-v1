@@ -2,22 +2,21 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  CreateDateColumn,
-  UpdateDateColumn,
 } from 'typeorm';
 import { Status } from '../enums/status.enum';
 import { Role } from '../enums/role.enum';
+import { BaseEntity } from '@/shared/entity/base.entity';
 
 @Entity('users')
-export class User {
+export class User extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  first_name: string;
+  @Column("varchar", { name: "first_name" })
+  firstName: string;
 
-  @Column()
-  last_name: string;
+  @Column("varchar", { name: "last_name" })
+  lastName: string;
 
   @Column({ unique: true })
   email: string;
@@ -27,7 +26,6 @@ export class User {
 
   @Column({
     type: 'varchar',
-    default: Role.USER,
   })
   role: Role;
 
@@ -42,10 +40,4 @@ export class User {
 
   @Column({ nullable: true })
   avatar: string;
-
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
 }
