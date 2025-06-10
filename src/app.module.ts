@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { type EnvVariables, validateEnv } from './utils/env.validate';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './modules/users/entities/user.entity';
+import { validateEnv } from './utils/env.validate';
+import { UtilsModule } from './utils/utils.module';
+import { JwtProviderModule } from './shared/jwt.module';
+import { DatabaseModule } from './shared/database/datasource';
 
 @Module({
   imports: [
@@ -12,26 +13,11 @@ import { User } from './modules/users/entities/user.entity';
       isGlobal: true,
       validate: validateEnv
     }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService<EnvVariables>) => {
-        return {
-          type: 'postgres',
-          host: configService.get('DB_HOST'),
-          port: configService.get('DB_PORT'),
-          username: configService.get('DB_USER'),
-          password: configService.get('DB_PASS'),
-          database: configService.get('DB_NAME'),
-          entities: [
-            User
-          ],
-          synchronize: configService.get('NODE_ENV') !== 'production',
-        };
-      },
-      inject: [ConfigService],
-    }),
+    DatabaseModule,
+    JwtProviderModule,
     AuthModule,
-    UsersModule
+    UsersModule,
+    UtilsModule,
   ],
 })
 export class AppModule {}

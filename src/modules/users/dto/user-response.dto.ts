@@ -7,10 +7,10 @@ export class UserResponseDto {
   id: string;
 
   @ApiProperty()
-  first_name: string;
+  firstName: string;
 
   @ApiProperty()
-  last_name: string;
+  lastName: string;
 
   @ApiProperty()
   email: string;
@@ -22,14 +22,14 @@ export class UserResponseDto {
   status: Status;
 
   @ApiProperty({ required: false })
-  last_login?: Date;
+  lastLogin?: Date;
 
   @ApiProperty({ required: false })
   avatar?: string;
 
   @ApiProperty()
-  created_at: Date;
+  createdAt: Date;
 
   @ApiProperty()
-  updated_at: Date;
+  updatedAt: Date;
 }

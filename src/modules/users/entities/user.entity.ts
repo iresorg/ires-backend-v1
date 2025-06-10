@@ -2,42 +2,39 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-} from 'typeorm';
-import { Status } from '../enums/status.enum';
-import { Role } from '../enums/role.enum';
-import { BaseEntity } from '@/shared/entity/base.entity';
+} from "typeorm";
+import { Status } from "../enums/status.enum";
+import { Role } from "../enums/role.enum";
+import { BaseEntity } from "@/shared/entity/base.entity";
 
-@Entity('users')
+@Entity("users")
 export class User extends BaseEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
   @Column("varchar", { name: "first_name" })
   firstName: string;
 
   @Column("varchar", { name: "last_name" })
   lastName: string;
 
-  @Column({ unique: true })
+  @Column({ type: "varchar", unique: true })
   email: string;
 
-  @Column()
+  @Column("varchar")
   password: string;
 
   @Column({
-    type: 'varchar',
+    type: "varchar",
   })
   role: Role;
 
   @Column({
-    type: 'varchar',
+    type: "varchar",
     default: Status.ACTIVE,
   })
   status: Status;
 
-  @Column({ nullable: true })
-  last_login: Date;
+  @Column({ type: "varchar", nullable: true, name: "last_login" })
+  lastLogin: Date;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: "varchar" })
   avatar: string;
 }

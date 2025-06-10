@@ -1,4 +1,5 @@
-import { plainToInstance } from 'class-transformer';
+import 'reflect-metadata';
+import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsEnum,
   IsNotEmpty,
@@ -17,6 +18,7 @@ export class EnvVariables {
   NODE_ENV: Environment;
 
   @IsNumber()
+  @Transform(({ value }) => parseInt(value, 10))
   DB_PORT: number;
 
   @IsString()
@@ -63,12 +65,13 @@ export function validateEnv(env: Record<string, unknown>) {
   const validatedEnv = plainToInstance(EnvVariables, env, {
     enableImplicitConversion: true,
   });
+  
   const errors = validateSync(validatedEnv, {
     skipMissingProperties: false,
   });
 
   if (errors.length > 0) {
-    throw new Error(errors.toString());
+    throw new Error(`Environment validation failed: ${errors.map(e => Object.values(e.constraints || {})).flat().join(', ')}`);
   }
 
   return validatedEnv;

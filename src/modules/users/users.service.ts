@@ -1,30 +1,66 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { IUser, IUserCreate, IUserUpdate } from './interfaces/user.interface';
+import { UserAlreadyExistsError, UserNotFoundError } from '@/shared/errors';
+import { IUserRepository } from './interfaces/user-repo.interface';
+import constants from './constants/constants';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
+    @Inject(constants.USER_REPOSITORY) private usersRepository: IUserRepository,
   ) {}
 
-  async findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async findAll(): Promise<IUser[]> {
+    const users = await this.usersRepository.findAll();
+    return users;
   }
 
-  async findOne(id: string): Promise<User> {
-    return this.usersRepository.findOne({ where: { id } });
+  async findOne(filter: { id?: string; email?: string }): Promise<IUser | null> {
+    if (filter.id) {
+      return this.usersRepository.findById(filter.id);
+    }
+    if (filter.email) {
+      return this.usersRepository.findByEmail(filter.email);
+    }
   }
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const user = this.usersRepository.create(createUserDto);
-    return this.usersRepository.save(user);
+  async update(
+    id: string,
+    updateUserDto: IUserUpdate
+  ): Promise<IUser | null> {
+    const user = await this.usersRepository.findById(id);
+    if (!user) throw new NotFoundException('User not found.');
+    try {
+      const updatedUser = await this.usersRepository.update(id, updateUserDto);
+      return updatedUser;
+    } catch (error) {
+      if (error instanceof UserNotFoundError) {
+        throw new NotFoundException('User not found.');
+      }
+      throw error;
+    }
   }
 
-  getHello(): string {
-    return 'Hello from UsersService!';
+  async create(createUserDto: IUserCreate): Promise<IUser> {
+    try {
+      const { email, firstName, lastName, password, role } = createUserDto;
+      const user = await this.usersRepository.create({
+        email,
+        firstName,
+        lastName,
+        password,
+        role,
+      });
+
+      return user;
+    } catch (error) {
+      if (error instanceof UserAlreadyExistsError) {
+        throw new ConflictException(
+          'User with this email already exists. Please check and try again later.'
+        );
+      }
+
+      throw error;
+    }
   }
 }
