@@ -21,7 +21,8 @@
       "@/*": ["src/*"],
       "@users/*": ["src/modules/users/*"],
       "@auth/*": ["src/modules/auth/*"],
-      "@common/*": ["src/common/*"]
+      "@common/*": ["src/common/*"],
+      "@agents/*": ["src/modules/agents/*"]
     }
   }
 }
