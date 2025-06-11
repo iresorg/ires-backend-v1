@@ -34,6 +34,14 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'warn',
       '@typescript-eslint/no-unsafe-call': 'warn',
       'quotes': ['error', 'double'],
+      "@typescript-eslint/no-unused-vars": [
+                1,
+                {
+                    argsIgnorePattern: "^_",
+                    varsIgnorePattern: "^_",
+                    ignoreRestSiblings: true
+                }
+            ]
     },
   },
 );
