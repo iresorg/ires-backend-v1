@@ -1,6 +1,5 @@
 export interface IAgent {
-	id: string;
-	userId: string;
+	agentId: string;
 	isActive: boolean;
 	createdAt: Date;
 	updatedAt: Date;

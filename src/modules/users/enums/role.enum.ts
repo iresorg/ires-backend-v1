@@ -1,7 +1,8 @@
 export enum Role {
-  ADMIN = 'admin',
-  MANAGER = 'manager',
-  SUPPORT = 'support',
-  TIER1_RESPONDER = "tier1_responder",
-  TIER2_RESPONDER = "tier2_responder",
+	SUPER_ADMIN = "SUPER_ADMIN",
+	ADMIN = "ADMIN",
+	AGENT = "AGENT",
+	AGENT_ADMIN = "AGENT_ADMIN",
+	RESPONDER_ADMIN = "RESPONDER_ADMIN",
+	RESPONDER = "RESPONDER",
 }

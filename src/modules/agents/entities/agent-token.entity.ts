@@ -2,17 +2,22 @@ import {
 	Column,
 	CreateDateColumn,
 	Entity,
-	ManyToOne,
+	OneToOne,
 	PrimaryGeneratedColumn,
-} from 'typeorm';
-import { Agent } from '@agents/entities/agent.entity';
+	JoinColumn,
+} from "typeorm";
+import { Agent } from "@agents/entities/agent.entity";
 
-@Entity('agent_tokens')
+@Entity("agent_tokens")
 export class AgentToken {
-	@PrimaryGeneratedColumn('uuid')
+	@PrimaryGeneratedColumn("uuid")
 	id: string;
 
-	@ManyToOne(() => Agent, (agent) => agent.tokens)
+	@Column({ unique: true })
+	agentId: string;
+
+	@OneToOne(() => Agent, (agent) => agent.token)
+	@JoinColumn({ name: "agentId" })
 	agent: Agent;
 
 	@Column()

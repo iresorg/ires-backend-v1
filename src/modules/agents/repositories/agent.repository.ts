@@ -1,41 +1,51 @@
-import { EntityRepository, Repository } from 'typeorm';
-import { Agent } from '../entities/agent.entity';
-import { AgentToken } from '../entities/agent-token.entity';
-import { MoreThan } from 'typeorm';
+import { Repository, MoreThan } from "typeorm";
+import { Agent } from "../entities/agent.entity";
+import { AgentToken } from "../entities/agent-token.entity";
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 
-@EntityRepository(Agent)
-export class AgentRepository extends Repository<Agent> {
+@Injectable()
+export class AgentRepository {
+	constructor(
+		@InjectRepository(Agent)
+		public readonly repository: Repository<Agent>,
+	) {}
+
 	async findActiveAgents(): Promise<Agent[]> {
-		return this.find({
+		return this.repository.find({
 			where: { isActive: true },
-			relations: ['tokens'],
+			relations: ["token"],
 		});
 	}
 
-	async findAgentWithActiveToken(agentId: string): Promise<Agent> {
-		return this.findOne({
-			where: { id: agentId },
-			relations: ['tokens'],
+	async findAgentWithToken(agentId: string): Promise<Agent> {
+		return this.repository.findOne({
+			where: { agentId },
+			relations: ["token"],
 		});
 	}
 }
 
-@EntityRepository(AgentToken)
-export class AgentTokenRepository extends Repository<AgentToken> {
+@Injectable()
+export class AgentTokenRepository {
+	constructor(
+		@InjectRepository(AgentToken)
+		public readonly repository: Repository<AgentToken>,
+	) {}
+
 	async findActiveToken(agentId: string): Promise<AgentToken> {
-		return this.findOne({
+		return this.repository.findOne({
 			where: {
-				agent: { id: agentId },
+				agentId,
 				isRevoked: false,
 				expiresAt: MoreThan(new Date()),
 			},
-			order: { createdAt: 'DESC' },
 		});
 	}
 
-	async revokeAllTokens(agentId: string): Promise<void> {
-		await this.update(
-			{ agent: { id: agentId }, isRevoked: false },
+	async revokeToken(agentId: string): Promise<void> {
+		await this.repository.update(
+			{ agentId, isRevoked: false },
 			{ isRevoked: true },
 		);
 	}
