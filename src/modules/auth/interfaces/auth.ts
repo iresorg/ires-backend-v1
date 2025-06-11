@@ -1,5 +1,7 @@
+import { Role } from "@/modules/users/enums/role.enum";
+
 export interface AuthPayload {
-    id: string;
-    role: string;
-    email: string;
+	id: string;
+	role: Role;
+	email: string;
 }
