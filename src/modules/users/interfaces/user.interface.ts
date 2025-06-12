@@ -36,4 +36,3 @@ export interface IUserUpdate {
 }
 
 export type IUserFind = Omit<IUser, "password">;
-

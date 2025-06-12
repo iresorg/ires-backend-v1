@@ -30,7 +30,6 @@ export class RoleGuard implements CanActivate {
 				"Access denied. You are not authorized to access this resource",
 			) as Error;
 		}
-
 		return true;
 	}
 }
