@@ -5,11 +5,29 @@ export interface IAgent {
 	updatedAt: Date;
 }
 
+export interface IAgentCreate {
+	agentId: string;
+}
+
+export interface IAgentUpdate {
+	isActive?: boolean;
+}
+
+export type IAgentFind = IAgent;
+
 export interface IAgentToken {
-	id: string;
-	agent: IAgent;
 	tokenHash: string;
-	createdAt: Date;
+	agentId: string;
 	expiresAt: Date;
 	isRevoked: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	encryptedToken: string;
+}
+
+export interface IAgentTokenCreate {
+	agentId: string;
+	tokenHash: string;
+	expiresAt: Date;
+	encryptedToken: string;
 }

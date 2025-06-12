@@ -5,6 +5,7 @@ import {
 	OneToOne,
 	PrimaryGeneratedColumn,
 	JoinColumn,
+	UpdateDateColumn,
 } from "typeorm";
 import { Agent } from "@agents/entities/agent.entity";
 
@@ -16,15 +17,21 @@ export class AgentToken {
 	@Column({ unique: true })
 	agentId: string;
 
-	@OneToOne(() => Agent, (agent) => agent.token)
+	@OneToOne(() => Agent)
 	@JoinColumn({ name: "agentId" })
 	agent: Agent;
 
 	@Column()
 	tokenHash: string;
 
+	@Column()
+	encryptedToken: string;
+
 	@CreateDateColumn()
 	createdAt: Date;
+
+	@UpdateDateColumn()
+	updatedAt: Date;
 
 	@Column()
 	expiresAt: Date;

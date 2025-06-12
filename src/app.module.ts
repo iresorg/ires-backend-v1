@@ -6,6 +6,7 @@ import { validateEnv } from "./utils/env.validate";
 import { UtilsModule } from "./utils/utils.module";
 import { JwtProviderModule } from "./shared/jwt.module";
 import { DatabaseModule } from "./shared/database/datasource";
+import { AgentsModule } from "./modules/agents/agents.module";
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { DatabaseModule } from "./shared/database/datasource";
 		AuthModule,
 		UsersModule,
 		UtilsModule,
+		AgentsModule,
 	],
 })
 export class AppModule {}

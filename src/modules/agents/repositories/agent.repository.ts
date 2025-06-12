@@ -3,37 +3,80 @@ import { Agent } from "../entities/agent.entity";
 import { AgentToken } from "../entities/agent-token.entity";
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import {
+	IAgentRepository,
+	IAgentTokenRepository,
+} from "../interfaces/agent-repo.interface";
+import {
+	IAgent,
+	IAgentCreate,
+	IAgentUpdate,
+} from "../interfaces/agent.interface";
+import { AgentNotFoundError } from "@/shared/errors/agent.errors";
 
 @Injectable()
-export class AgentRepository {
+export class AgentRepository implements IAgentRepository {
 	constructor(
 		@InjectRepository(Agent)
-		public readonly repository: Repository<Agent>,
+		private repository: Repository<Agent>,
 	) {}
 
-	async findActiveAgents(): Promise<Agent[]> {
-		return this.repository.find({
-			where: { isActive: true },
-			relations: ["token"],
-		});
+	async create(data: IAgentCreate): Promise<IAgent> {
+		const agent = this.repository.create(data);
+		return this.repository.save(agent);
 	}
 
-	async findAgentWithToken(agentId: string): Promise<Agent> {
-		return this.repository.findOne({
-			where: { agentId },
-			relations: ["token"],
-		});
+	async findAll(): Promise<IAgent[]> {
+		return this.repository.find();
+	}
+
+	async findActiveAgents(): Promise<IAgent[]> {
+		return this.repository.find({ where: { isActive: true } });
+	}
+
+	async findById(agentId: string): Promise<IAgent | null> {
+		return this.repository.findOne({ where: { agentId } });
+	}
+
+	async update(agentId: string, data: IAgentUpdate): Promise<IAgent> {
+		const result = await this.repository.update(agentId, data);
+		if (result.affected === 0) {
+			throw new AgentNotFoundError(`Agent with id ${agentId} not found`);
+		}
+		const updatedAgent = await this.findById(agentId);
+		if (!updatedAgent) {
+			throw new AgentNotFoundError(
+				`Agent with id ${agentId} not found after update`,
+			);
+		}
+		return updatedAgent;
+	}
+
+	async delete(agentId: string): Promise<boolean> {
+		const result = await this.repository.delete(agentId);
+		if (result.affected === 0)
+			throw new AgentNotFoundError(`Agent with id ${agentId} not found.`);
+		return true;
 	}
 }
 
 @Injectable()
-export class AgentTokenRepository {
+export class AgentTokenRepository implements IAgentTokenRepository {
 	constructor(
 		@InjectRepository(AgentToken)
-		public readonly repository: Repository<AgentToken>,
+		private repository: Repository<AgentToken>,
 	) {}
 
-	async findActiveToken(agentId: string): Promise<AgentToken> {
+	async create(data: {
+		agentId: string;
+		tokenHash: string;
+		expiresAt: Date;
+	}): Promise<AgentToken> {
+		const token = this.repository.create(data);
+		return this.repository.save(token);
+	}
+
+	async findActiveToken(agentId: string): Promise<AgentToken | null> {
 		return this.repository.findOne({
 			where: {
 				agentId,
