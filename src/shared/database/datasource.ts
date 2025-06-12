@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { DataSource, DataSourceOptions } from "typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { User } from "../../modules/users/entities/user.entity";
+import { Agent } from "../../modules/agents/entities/agent.entity";
+import { AgentToken } from "../../modules/agents/entities/agent-token.entity";
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Environment, EnvVariables, validateEnv } from "@/utils/env.validate";
@@ -19,7 +21,7 @@ export function createDataSourceOptions(
 		username: config.DB_USER,
 		password: config.DB_PASS,
 		database: config.DB_NAME,
-		entities: [User],
+		entities: [User, Agent, AgentToken],
 		synchronize: config.NODE_ENV !== Environment.Production,
 		logging: false,
 	};

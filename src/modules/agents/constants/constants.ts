@@ -1,0 +1,5 @@
+export default {
+	AGENT_REPOSITORY: Symbol.for("AGENT_REPOSITORY"),
+	AGENT_TOKEN_REPOSITORY: Symbol.for("AGENT_TOKEN_REPOSITORY"),
+};
+
