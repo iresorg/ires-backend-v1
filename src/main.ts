@@ -4,9 +4,14 @@ import { AppModule } from "./app.module";
 import helmet from "helmet";
 import { ValidationPipe } from "@nestjs/common";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filters";
+import { Logger } from "./shared/logger/service";
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule);
+	const app = await NestFactory.create(AppModule, {
+		bufferLogs: true,
+	});
+	const logger = await app.resolve(Logger);
+	app.useLogger(logger);
 
 	// Security middleware
 	app.use(
@@ -33,7 +38,7 @@ async function bootstrap() {
 		}),
 	);
 
-	app.useGlobalFilters(new AllExceptionsFilter());
+	app.useGlobalFilters(new AllExceptionsFilter(logger));
 
 	app.setGlobalPrefix("api/v1");
 

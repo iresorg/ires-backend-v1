@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -7,6 +7,10 @@ import { UtilsModule } from "./utils/utils.module";
 import { JwtProviderModule } from "./shared/jwt.module";
 import { DatabaseModule } from "./shared/database/datasource";
 import { AgentsModule } from "./modules/agents/agents.module";
+import { AsyncContextMiddleware } from "./shared/async-context/middleware";
+import { AsyncContextModule } from "./shared/async-context/module";
+import { LoggerModule } from "./shared/logger/module";
+import { Logger } from "./shared/logger/service";
 
 @Module({
 	imports: [
@@ -20,6 +24,14 @@ import { AgentsModule } from "./modules/agents/agents.module";
 		UsersModule,
 		UtilsModule,
 		AgentsModule,
+		AsyncContextModule,
+		LoggerModule,
 	],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+	constructor(private readonly logger: Logger) {}
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(AsyncContextMiddleware).forRoutes("*");
+		consumer.apply(this.logger.logRequestSummary()).forRoutes("*");
+	}
+}
