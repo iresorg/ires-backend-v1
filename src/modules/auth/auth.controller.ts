@@ -31,16 +31,4 @@ export class AuthController {
 			data,
 		};
 	}
-
-	@UseGuards(RoleGuard)
-	@Roles(Role.SUPER_ADMIN)
-	@HttpCode(HttpStatus.CREATED)
-	@Post("signup")
-	async signUpUser(@Body() body: CreateUserDto) {
-		await this.authService.signUpUser(body);
-
-		return {
-			message: "User created successfully",
-		};
-	}
 }

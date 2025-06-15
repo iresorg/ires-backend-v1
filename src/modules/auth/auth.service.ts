@@ -15,26 +15,6 @@ export class AuthService {
 		private readonly emailService: EmailService,
 	) {}
 
-	async signUpUser(body: CreateUserDto): Promise<IUser> {
-		const password = this.utils.generatePassword(8);
-
-		const user = await this.usersService.create({
-			firstName: body.firstName,
-			lastName: body.lastName,
-			email: body.email,
-			role: body.role,
-			password: await this.utils.createHash(password),
-		});
-
-		await this.emailService.sendWelcomeEmail(
-			user.email,
-			password,
-			`${user.firstName} ${user.lastName}`,
-		);
-
-		return user;
-	}
-
 	async login(body: LoginDto): Promise<LoginResponseDto> {
 		const user = await this.usersService.findOne({ email: body.email });
 		if (!user) {

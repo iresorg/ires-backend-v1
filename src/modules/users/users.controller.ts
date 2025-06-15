@@ -82,19 +82,16 @@ export class UsersController {
 	})
 	async createUser(
 		@Body() createUserDto: CreateUserDto,
-	): Promise<{ message: string; data: UserResponseDto }> {
-		const user = await this.usersService.create({
+	): Promise<{ message: string }> {
+		await this.usersService.create({
 			firstName: createUserDto.firstName,
 			lastName: createUserDto.lastName,
 			email: createUserDto.email,
-			password: createUserDto.password,
 			role: createUserDto.role,
 		});
-		const data = UserResponseDto.fromUser(user);
 
 		return {
 			message: "User created successfully",
-			data,
 		};
 	}
 
@@ -181,9 +178,6 @@ export class UsersController {
 		const user = await this.usersService.update(id, {
 			firstName: updateUserDto.firstName,
 			lastName: updateUserDto.lastName,
-			email: updateUserDto.email,
-			password: updateUserDto.password,
-			role: updateUserDto.role,
 		});
 
 		if (!user)

@@ -23,11 +23,6 @@ export class CreateUserDto {
 	@IsEmail()
 	email: string;
 
-	@ApiProperty({ description: "User password", minLength: 8 })
-	@IsString()
-	@MinLength(8)
-	password: string;
-
 	@ApiProperty({ description: "User role", enum: Role, required: false })
 	@IsEnum(Role)
 	@IsOptional()

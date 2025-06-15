@@ -12,12 +12,16 @@ import type {
 import { UserAlreadyExistsError, UserNotFoundError } from "@/shared/errors";
 import { IUserRepository } from "./interfaces/user-repo.interface";
 import constants from "./constants/constants";
+import { Utils } from "@/utils/utils";
+import { EmailService } from "@/shared/email/service";
 
 @Injectable()
 export class UsersService {
 	constructor(
 		@Inject(constants.USER_REPOSITORY)
 		private usersRepository: IUserRepository,
+		private readonly utils: Utils,
+		private readonly emailService: EmailService,
 	) {}
 
 	async findAll(): Promise<IUser[]> {
@@ -57,17 +61,23 @@ export class UsersService {
 		}
 	}
 
-	async create(createUserDto: IUserCreate): Promise<IUser> {
+	async create(createUserDto: Omit<IUserCreate, "password">): Promise<IUser> {
 		try {
-			const { email, firstName, lastName, password, role } =
-				createUserDto;
+			const password = this.utils.generatePassword(8);
+
 			const user = await this.usersRepository.create({
-				email,
-				firstName,
-				lastName,
-				password,
-				role,
+				firstName: createUserDto.firstName,
+				lastName: createUserDto.lastName,
+				email: createUserDto.email,
+				role: createUserDto.role,
+				password: await this.utils.createHash(password),
 			});
+
+			await this.emailService.sendWelcomeEmail(
+				user.email,
+				password,
+				`${user.firstName} ${user.lastName}`,
+			);
 
 			return user;
 		} catch (error) {
