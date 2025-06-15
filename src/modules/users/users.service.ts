@@ -92,16 +92,29 @@ export class UsersService {
 	}
 
 	async delete(id: string): Promise<boolean> {
-		try {
-			const user = await this.usersRepository.findById(id);
-			if (!user) throw new NotFoundException("User not found.");
+		const user = await this.usersRepository.findById(id);
+		if (!user) throw new UserNotFoundError();
 
-			return await this.usersRepository.delete(id);
-		} catch (error) {
-			if (error instanceof UserNotFoundError) {
-				throw new NotFoundException("User not found.");
-			}
-			throw error;
-		}
+		return await this.usersRepository.delete(id);
+	}
+
+	async activateUser(userId: string): Promise<IUser> {
+		let user = await this.usersRepository.findById(userId);
+		if (!user) throw new UserNotFoundError();
+
+		user = await this.usersRepository.update(userId, { status: "active" });
+
+		return user;
+	}
+
+	async deactivateUser(userId: string): Promise<IUser> {
+		let user = await this.usersRepository.findById(userId);
+		if (!user) throw new UserNotFoundError();
+
+		user = await this.usersRepository.update(userId, {
+			status: "deactivated",
+		});
+
+		return user;
 	}
 }

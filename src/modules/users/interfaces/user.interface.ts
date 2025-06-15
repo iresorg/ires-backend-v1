@@ -11,9 +11,8 @@ export interface IUser {
 	avatar: string;
 	createdAt: Date;
 	updatedAt: Date;
+	deletedAt?: Date;
 	lastLogin?: Date;
-	isActive?: boolean;
-	isDeleted?: boolean;
 }
 
 export interface IUserCreate {

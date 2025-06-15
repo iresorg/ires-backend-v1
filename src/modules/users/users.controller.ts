@@ -8,6 +8,7 @@ import {
 	Param,
 	NotFoundException,
 	Req,
+	Patch,
 } from "@nestjs/common";
 import { UsersService } from "./users.service";
 import {
@@ -15,6 +16,7 @@ import {
 	ApiTags,
 	ApiOperation,
 	ApiResponse,
+	ApiParam,
 } from "@nestjs/swagger";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { Role } from "./enums/role.enum";
@@ -188,6 +190,47 @@ export class UsersController {
 		return {
 			message: "User profile updated successfully",
 			data: UserResponseDto.fromUser(user),
+		};
+	}
+
+	@Patch(":userId/activate")
+	@ApiParam({ name: "userId", description: "The ID of the user to activate" })
+	@Roles(Role.SUPER_ADMIN)
+	@ApiOperation({ summary: "Activate user" })
+	@ApiResponse({
+		status: 200,
+		description: "User activated successfully",
+	})
+	async activateUser(
+		@Param("userId") userId: string,
+	): Promise<{ message: string; data: UserResponseDto }> {
+		const data = await this.usersService.activateUser(userId);
+
+		return {
+			message: "User activated successfully",
+			data: UserResponseDto.fromUser(data),
+		};
+	}
+
+	@Patch(":userId/deactivate")
+	@ApiParam({
+		name: "userId",
+		description: "The ID of the user to deactivate",
+	})
+	@Roles(Role.SUPER_ADMIN)
+	@ApiOperation({ summary: "Deactivate user" })
+	@ApiResponse({
+		status: 200,
+		description: "User deactivated successfully",
+	})
+	async deactivateUser(
+		@Param("userId") userId: string,
+	): Promise<{ message: string; data: UserResponseDto }> {
+		const data = await this.usersService.deactivateUser(userId);
+
+		return {
+			message: "User deactivated successfully",
+			data: UserResponseDto.fromUser(data),
 		};
 	}
 }
