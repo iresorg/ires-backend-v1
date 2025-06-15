@@ -4,16 +4,15 @@ import {
 	HttpCode,
 	HttpStatus,
 	Post,
+	Req,
 	UseGuards,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login";
-import { CreateUserDto } from "./dto/create-user";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { Public } from "@/shared/decorators/public.decorator";
-import { RoleGuard } from "@/shared/guards/roles.guard";
-import { Roles } from "@/shared/decorators/role.decorator";
-import { Role } from "../users/enums/role.enum";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { AuthRequest } from "@/shared/interfaces/request.interface";
 
 @UseGuards(AuthGuard)
 @Controller("auth")
@@ -29,6 +28,19 @@ export class AuthController {
 		return {
 			message: "Login successful",
 			data,
+		};
+	}
+
+	@HttpCode(HttpStatus.OK)
+	@Post("change-password")
+	async changePassword(
+		@Body() body: ChangePasswordDto,
+		@Req() req: AuthRequest,
+	) {
+		await this.authService.changePassword(body, req.user.id);
+
+		return {
+			message: "Password changed successfully",
 		};
 	}
 }
