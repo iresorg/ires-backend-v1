@@ -7,9 +7,10 @@ import { UserRepository } from "./users.repository";
 import constants from "./constants/constants";
 import { APP_GUARD } from "@nestjs/core";
 import { AuthGuard } from "@/shared/guards/auth.guard";
+import { EmailModule } from "@/shared/email/module";
 
 @Module({
-	imports: [TypeOrmModule.forFeature([User])],
+	imports: [TypeOrmModule.forFeature([User]), EmailModule],
 	controllers: [UsersController],
 	providers: [
 		{

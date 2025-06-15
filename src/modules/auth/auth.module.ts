@@ -5,9 +5,10 @@ import { UsersModule } from "../users/users.module";
 import { UtilsModule } from "@/utils/utils.module";
 import { JwtProviderModule } from "@/shared/jwt.module";
 import { JwtStrategy } from "@/shared/strategies/jwt.strategy";
+import { EmailModule } from "@/shared/email/module";
 
 @Module({
-	imports: [UtilsModule, UsersModule, JwtProviderModule],
+	imports: [UtilsModule, UsersModule, JwtProviderModule, EmailModule],
 	controllers: [AuthController],
 	providers: [AuthService, JwtStrategy],
 	exports: [AuthService, JwtStrategy],

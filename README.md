@@ -49,6 +49,56 @@ src/
 
 ## Getting Started
 
+### Quick Setup with Docker Compose
+
+The easiest way to get started is using the provided Docker Compose file, which sets up both PostgreSQL and RabbitMQ services:
+
+**Prerequisites:**
+- Docker installed on your device ([Download Docker](https://docs.docker.com/get-docker/))
+
+**Start the services:**
+```bash
+docker compose up
+```
+
+This will start:
+- **PostgreSQL** on port `5432` with credentials:
+  - Username: `postgres`
+  - Password: `postgres`
+  - Database: `ires`
+- **RabbitMQ** on port `5673` with management UI on port `15672`:
+  - Username: `ires`
+  - Password: `ires`
+  - Management UI: http://localhost:15672
+
+**Note:** Make sure to update your `.env` file to use the correct ports:
+```env
+DB_HOST=localhost
+DB_PORT=5432
+AMQP_URL=amqp://ires:ires@localhost:5673
+```
+
+### Email Configuration (Required)
+
+For local development, this application uses **Mailtrap** to catch and test emails. You'll need to:
+
+1. **Sign up for Mailtrap** at [https://mailtrap.io](https://mailtrap.io) (free tier available)
+2. **Get your SMTP credentials** from your Mailtrap inbox
+3. **Add them to your `.env` file**:
+
+```env
+EMAIL_HOST=sandbox.smtp.mailtrap.io
+EMAIL_PORT=2525
+EMAIL_USER=your_mailtrap_username
+EMAIL_PASSWORD=your_mailtrap_password
+```
+
+**Important:** The application will not start without these email credentials configured.
+
+### Manual Setup
+
+If you prefer to set up services manually:
+
 ### Prerequisites
 
 - Node.js (v16 or higher)
@@ -95,6 +145,19 @@ DB_USER=postgres
 DB_PASS=your_database_password
 DB_NAME=ires_db
 DB_TYPE=postgres
+
+# =============================================================================
+# Queue Configuration
+# =============================================================================
+AMQP_URL=amqp://ires:ires@localhost:5673
+
+# =============================================================================
+# Email Configuration (Mailtrap for Development)
+# =============================================================================
+EMAIL_HOST=sandbox.smtp.mailtrap.io
+EMAIL_PORT=2525
+EMAIL_USER=your_mailtrap_username
+EMAIL_PASSWORD=your_mailtrap_password
 
 # =============================================================================
 # JWT Authentication

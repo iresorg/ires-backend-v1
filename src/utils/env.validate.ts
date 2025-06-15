@@ -5,15 +5,22 @@ import {
 	IsNotEmpty,
 	IsNumber,
 	IsString,
+	IsUrl,
 	validateSync,
 } from "class-validator";
 
 export enum Environment {
 	Development = "development",
 	Production = "production",
+	Test = "test",
 }
 
 export class EnvVariables {
+	@IsString()
+	
+	AMQP_URL: string;
+
+	@IsString()
 	@IsEnum(Environment)
 	NODE_ENV: Environment;
 
@@ -35,6 +42,19 @@ export class EnvVariables {
 
 	@IsString()
 	DB_TYPE: string;
+
+	@IsString()
+	EMAIL_HOST: string;
+
+	@IsNumber()
+	@Transform(({ value }: { value: string }) => parseInt(value, 10))
+	EMAIL_PORT: number;
+
+	@IsString()
+	EMAIL_USER: string;
+
+	@IsString()
+	EMAIL_PASSWORD: string;
 
 	@IsString()
 	@IsNotEmpty()

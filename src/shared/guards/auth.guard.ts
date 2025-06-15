@@ -10,12 +10,14 @@ import { Request } from "express";
 import { AuthRequest } from "../interfaces/request.interface";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { AsyncContextService } from "../async-context/service";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
 	constructor(
 		private readonly utils: Utils,
 		private reflector: Reflector,
+		private readonly asyncContextService: AsyncContextService,
 	) {}
 
 	canActivate(context: ExecutionContext): boolean {
@@ -37,6 +39,8 @@ export class AuthGuard implements CanActivate {
 		const payload = this.utils.verifyJWT<AuthPayload>(token);
 
 		request.user = payload;
+
+		this.asyncContextService.set("userId", payload.id);
 
 		return true;
 	}

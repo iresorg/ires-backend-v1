@@ -12,12 +12,16 @@ import type {
 import { UserAlreadyExistsError, UserNotFoundError } from "@/shared/errors";
 import { IUserRepository } from "./interfaces/user-repo.interface";
 import constants from "./constants/constants";
+import { Utils } from "@/utils/utils";
+import { EmailService } from "@/shared/email/service";
 
 @Injectable()
 export class UsersService {
 	constructor(
 		@Inject(constants.USER_REPOSITORY)
 		private usersRepository: IUserRepository,
+		private readonly utils: Utils,
+		private readonly emailService: EmailService,
 	) {}
 
 	async findAll(): Promise<IUser[]> {
@@ -57,17 +61,23 @@ export class UsersService {
 		}
 	}
 
-	async create(createUserDto: IUserCreate): Promise<IUser> {
+	async create(createUserDto: Omit<IUserCreate, "password">): Promise<IUser> {
 		try {
-			const { email, firstName, lastName, password, role } =
-				createUserDto;
+			const password = this.utils.generatePassword(8);
+
 			const user = await this.usersRepository.create({
-				email,
-				firstName,
-				lastName,
-				password,
-				role,
+				firstName: createUserDto.firstName,
+				lastName: createUserDto.lastName,
+				email: createUserDto.email,
+				role: createUserDto.role,
+				password: await this.utils.createHash(password),
 			});
+
+			await this.emailService.sendWelcomeEmail(
+				user.email,
+				password,
+				`${user.firstName} ${user.lastName}`,
+			);
 
 			return user;
 		} catch (error) {
@@ -82,16 +92,29 @@ export class UsersService {
 	}
 
 	async delete(id: string): Promise<boolean> {
-		try {
-			const user = await this.usersRepository.findById(id);
-			if (!user) throw new NotFoundException("User not found.");
+		const user = await this.usersRepository.findById(id);
+		if (!user) throw new UserNotFoundError();
 
-			return await this.usersRepository.delete(id);
-		} catch (error) {
-			if (error instanceof UserNotFoundError) {
-				throw new NotFoundException("User not found.");
-			}
-			throw error;
-		}
+		return await this.usersRepository.delete(id);
+	}
+
+	async activateUser(userId: string): Promise<IUser> {
+		let user = await this.usersRepository.findById(userId);
+		if (!user) throw new UserNotFoundError();
+
+		user = await this.usersRepository.update(userId, { status: "active" });
+
+		return user;
+	}
+
+	async deactivateUser(userId: string): Promise<IUser> {
+		let user = await this.usersRepository.findById(userId);
+		if (!user) throw new UserNotFoundError();
+
+		user = await this.usersRepository.update(userId, {
+			status: "deactivated",
+		});
+
+		return user;
 	}
 }
