@@ -7,13 +7,11 @@ import SMTPTransport from "nodemailer/lib/smtp-transport";
 import { ConsumeMessage } from "amqplib";
 import { render } from "@react-email/render";
 import NewUser from "@/shared/email/templates/NewUser";
-import ChangePassword from "@/shared/email/templates/ChangePassword";
 import { EmailComponent, EmailPayload } from "@/shared/email/types";
 import { Logger } from "@/shared/logger/service";
 
 export const templates = {
 	NewUser,
-	ChangePassword,
 };
 
 @Injectable()
@@ -72,6 +70,8 @@ export class EmailConsumer implements OnModuleInit {
 			const emailBody = await render(component(options));
 
 			await this.sendMail({ from, to, subject, html: emailBody });
+
+			this.queueService.acknowledgeMessage(message);
 		} catch (error) {
 			this.logger.error("Failed to process email message", {
 				error: error as Error,
