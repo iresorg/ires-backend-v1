@@ -5,12 +5,14 @@ import { Utils } from "@/utils/utils";
 import type { IUser } from "../users/interfaces/user.interface";
 import type { LoginDto, LoginResponseDto } from "./dto/login";
 import type { AuthPayload } from "./interfaces/auth";
+import { EmailService } from "@/shared/email/service";
 
 @Injectable()
 export class AuthService {
 	constructor(
 		private readonly usersService: UsersService,
 		private readonly utils: Utils,
+		private readonly emailService: EmailService,
 	) {}
 
 	async signUpUser(body: CreateUserDto): Promise<IUser> {
@@ -23,7 +25,12 @@ export class AuthService {
 			role: body.role,
 			password: await this.utils.createHash(password),
 		});
-		// TODO: Send a mail with their password and probably link to login
+
+		await this.emailService.sendWelcomeEmail(
+			user.email,
+			password,
+			`${user.firstName} ${user.lastName}`,
+		);
 
 		return user;
 	}

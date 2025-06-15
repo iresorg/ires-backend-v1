@@ -11,6 +11,8 @@ import { AsyncContextMiddleware } from "./shared/async-context/middleware";
 import { AsyncContextModule } from "./shared/async-context/module";
 import { LoggerModule } from "./shared/logger/module";
 import { Logger } from "./shared/logger/service";
+import { QueueModule } from "./shared/queue/module";
+import { EmailModule } from "./shared/email/module";
 
 @Module({
 	imports: [
@@ -26,6 +28,8 @@ import { Logger } from "./shared/logger/service";
 		AgentsModule,
 		AsyncContextModule,
 		LoggerModule,
+		EmailModule,
+		QueueModule,
 	],
 })
 export class AppModule implements NestModule {
