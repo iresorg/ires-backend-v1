@@ -24,7 +24,10 @@
       "@users/*": ["src/modules/users/*"],
       "@auth/*": ["src/modules/auth/*"],
       "@common/*": ["src/common/*"],
-      "@agents/*": ["src/modules/agents/*"]
+      "@agents/*": ["src/modules/agents/*"],
+      "@shared/*": ["src/shared/*"],
+      "@utils/*": ["src/utils/*"],
+      "@types/*": ["src/types/*"]
     }
   }
 }

@@ -1,7 +1,7 @@
 import { Repository, MoreThan } from "typeorm";
 import { Agent } from "../entities/agent.entity";
 import { AgentToken } from "../entities/agent-token.entity";
-import { Injectable } from "@nestjs/common";
+import { Injectable, ConflictException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
 	IAgentRepository,
@@ -70,10 +70,27 @@ export class AgentTokenRepository implements IAgentTokenRepository {
 	async create(data: {
 		agentId: string;
 		tokenHash: string;
+		encryptedToken: string;
 		expiresAt: Date;
 	}): Promise<AgentToken> {
-		const token = this.repository.create(data);
-		return this.repository.save(token);
+		try {
+			const token = this.repository.create(data);
+			return await this.repository.save(token);
+		} catch (error: any) {
+			// Handle database constraint violations
+			if ((error as { code?: string })?.code === "23505") {
+				// PostgreSQL unique constraint violation
+				throw new ConflictException(
+					"Token already exists for this agent. Please revoke existing token first.",
+				);
+			}
+			if ((error as { code?: string })?.code === "23503") {
+				// PostgreSQL foreign key constraint violation
+				throw new ConflictException("Agent not found.");
+			}
+			// Re-throw other database errors
+			throw error;
+		}
 	}
 
 	async findActiveToken(agentId: string): Promise<AgentToken | null> {
@@ -87,9 +104,6 @@ export class AgentTokenRepository implements IAgentTokenRepository {
 	}
 
 	async revokeToken(agentId: string): Promise<void> {
-		await this.repository.update(
-			{ agentId, isRevoked: false },
-			{ isRevoked: true },
-		);
+		await this.repository.delete({ agentId });
 	}
 }

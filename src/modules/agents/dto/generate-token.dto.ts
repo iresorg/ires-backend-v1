@@ -1,5 +1,6 @@
-import { IsDateString, IsNotEmpty } from "class-validator";
+import { IsDateString, IsNotEmpty, Validate } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { IsFutureDate } from "@/shared/validators/is-future-date.validator";
 
 export class GenerateTokenDto {
 	@ApiProperty({
@@ -15,5 +16,8 @@ export class GenerateTokenDto {
 				"Invalid date format. Please use ISO format (YYYY-MM-DDTHH:mm:ssZ)",
 		},
 	)
+	@Validate(IsFutureDate, {
+		message: "Expiration date must be in the future",
+	})
 	expiresAt: string;
 }
