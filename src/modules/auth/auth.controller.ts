@@ -13,6 +13,7 @@ import { AuthGuard } from "@/shared/guards/auth.guard";
 import { Public } from "@/shared/decorators/public.decorator";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
+import { AgentLoginDto } from "./dto/agent-login.dto";
 
 @UseGuards(AuthGuard)
 @Controller("auth")
@@ -27,6 +28,18 @@ export class AuthController {
 
 		return {
 			message: "Login successful",
+			data,
+		};
+	}
+
+	@Public()
+	@HttpCode(HttpStatus.OK)
+	@Post("agent-login")
+	async agentLogin(@Body() body: AgentLoginDto) {
+		const data = await this.authService.agentLogin(body);
+
+		return {
+			message: "Agent login successful",
 			data,
 		};
 	}

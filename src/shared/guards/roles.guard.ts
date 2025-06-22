@@ -22,13 +22,20 @@ export class RoleGuard implements CanActivate {
 		if (!requiredRoles || requiredRoles.length === 0) return true;
 
 		const request = context.switchToHttp().getRequest<AuthRequest>();
+		const user = request.user;
 
-		const userRole = request.user.role;
+		if (!user || !user.role) {
+			throw new ForbiddenException(
+				"Access denied. Authentication required.",
+			);
+		}
+
+		const userRole = user.role;
 
 		if (!requiredRoles.includes(userRole)) {
 			throw new ForbiddenException(
 				"Access denied. You are not authorized to access this resource",
-			) as Error;
+			);
 		}
 		return true;
 	}

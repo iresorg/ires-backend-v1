@@ -3,6 +3,7 @@ import {
 	Inject,
 	ConflictException,
 	NotFoundException,
+	BadRequestException,
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
 import { UpdateAgentStatusDto } from "./dto/update-agent-status.dto";
@@ -21,6 +22,7 @@ import { generateUniqueAgentId } from "./utils/agent-id.generator";
 import { TokenEncryption } from "@/shared/utils/token-encryption.util";
 import { ConfigService } from "@nestjs/config";
 import { EnvVariables } from "@/utils/env.validate";
+import { Utils } from "@/utils/utils";
 
 @Injectable()
 export class AgentsService {
@@ -30,6 +32,7 @@ export class AgentsService {
 		@Inject(constants.AGENT_TOKEN_REPOSITORY)
 		private agentTokenRepository: IAgentTokenRepository,
 		private configService: ConfigService<EnvVariables>,
+		private utils: Utils,
 	) {
 		// Initialize token encryption
 		TokenEncryption.initialize(configService).catch((error) => {
@@ -91,25 +94,51 @@ export class AgentsService {
 		agentId: string,
 		generateTokenDto: GenerateTokenDto,
 	): Promise<string> {
-		await this.findOne(agentId); // Verify agent exists
+		try {
+			await this.findOne(agentId); // Verify agent exists
 
-		// Generate a random token
-		const token = Math.random().toString(36).substring(2, 15);
-		const tokenHash = await bcrypt.hash(token, 10);
-		const encryptedToken = TokenEncryption.encrypt(token);
+			// Validate expiration date is in the future
+			const expirationDate = new Date(generateTokenDto.expiresAt);
+			const currentDate = new Date();
 
-		// Revoke existing token if any
-		await this.agentTokenRepository.revokeToken(agentId);
+			if (expirationDate <= currentDate) {
+				throw new BadRequestException(
+					"Expiration date must be in the future",
+				);
+			}
 
-		// Create new token record
-		await this.agentTokenRepository.create({
-			agentId,
-			tokenHash,
-			encryptedToken,
-			expiresAt: new Date(generateTokenDto.expiresAt),
-		});
+			// Generate a random token
+			const token = Math.random().toString(36).substring(2, 15);
+			const tokenHash = await bcrypt.hash(token, 10);
+			const encryptedToken = TokenEncryption.encrypt(token);
 
-		return token; // Return the original token to the client
+			// Revoke existing token if any
+			await this.agentTokenRepository.revokeToken(agentId);
+
+			// Create new token record
+			await this.agentTokenRepository.create({
+				agentId,
+				tokenHash,
+				encryptedToken,
+				expiresAt: expirationDate,
+			});
+
+			return token; // Return the original token to the client
+		} catch (error) {
+			if (
+				error instanceof BadRequestException ||
+				error instanceof ConflictException
+			) {
+				throw error; // Re-throw validation and conflict errors
+			}
+			if (error instanceof NotFoundException) {
+				throw new NotFoundException("Agent not found.");
+			}
+			// Handle unexpected errors
+			throw new BadRequestException(
+				"Failed to generate token. Please try again.",
+			);
+		}
 	}
 
 	async validateToken(agentId: string, token: string): Promise<boolean> {

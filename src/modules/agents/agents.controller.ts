@@ -10,6 +10,8 @@ import {
 	Param,
 	Put,
 	UseGuards,
+	Req,
+	UnauthorizedException,
 } from "@nestjs/common";
 import { AgentsService } from "./agents.service";
 import { JwtAuthGuard } from "@auth/guards/jwt-auth.guard";
@@ -26,6 +28,7 @@ import {
 } from "@nestjs/swagger";
 import { AgentResponseDto } from "./dto/agent-response.dto";
 import { IAgent } from "./interfaces/agent.interface";
+import { AuthRequest } from "@/shared/interfaces/request.interface";
 
 @ApiTags("Agents")
 @ApiBearerAuth()
@@ -170,10 +173,55 @@ export class AgentsController {
 	@ApiResponse({
 		status: 200,
 		description: "Agent token retrieved successfully",
-		type: String,
+		schema: {
+			type: "object",
+			properties: {
+				token: { type: "string", nullable: true },
+				message: { type: "string" },
+			},
+		},
 	})
-	async getToken(@Param("id") id: string): Promise<{ token: string | null }> {
+	async getToken(
+		@Param("id") id: string,
+	): Promise<{ token: string | null; message: string }> {
 		const token = await this.agentsService.getToken(id);
-		return { token };
+
+		if (token) {
+			return {
+				token,
+				message: "Agent token retrieved successfully",
+			};
+		} else {
+			return {
+				token: null,
+				message:
+					"No active token found. Token may have expired or been revoked.",
+			};
+		}
+	}
+
+	@Get("profile")
+	@Roles(Role.AGENT)
+	@ApiOperation({ summary: "Get agent profile (for authenticated agents)" })
+	@ApiResponse({
+		status: 200,
+		description: "Agent profile retrieved successfully",
+		type: AgentResponseDto,
+	})
+	async getAgentProfile(
+		@Req() req: AuthRequest,
+	): Promise<{ message: string; data: AgentResponseDto }> {
+		// req.user will contain agent info from JWT
+		if (req.user.type !== "agent") {
+			throw new UnauthorizedException("This endpoint is for agents only");
+		}
+
+		const agentId = req.user.agentId;
+		const agent = await this.agentsService.findOne(agentId);
+		const response = AgentResponseDto.fromAgent(agent);
+		return {
+			message: "Agent profile retrieved successfully",
+			data: response,
+		};
 	}
 }

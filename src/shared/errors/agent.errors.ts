@@ -1,20 +1,23 @@
-export class AgentNotFoundError extends Error {
+import {
+	NotFoundException,
+	ConflictException,
+	UnauthorizedException,
+} from "@nestjs/common";
+
+export class AgentNotFoundError extends NotFoundException {
 	constructor(message: string) {
 		super(message);
-		this.name = "AgentNotFoundError";
 	}
 }
 
-export class AgentAlreadyExistsError extends Error {
+export class AgentAlreadyExistsError extends ConflictException {
 	constructor(message: string) {
 		super(message);
-		this.name = "AgentAlreadyExistsError";
 	}
 }
 
-export class AgentTokenError extends Error {
+export class AgentTokenError extends UnauthorizedException {
 	constructor(message: string) {
 		super(message);
-		this.name = "AgentTokenError";
 	}
 }
