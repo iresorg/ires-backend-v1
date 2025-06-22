@@ -24,6 +24,11 @@ export class AuthService {
 			throw new UnauthorizedException("Invalid credentials");
 		}
 
+		if (user.status !== "active")
+			throw new UnauthorizedException(
+				"User deactivated. Please cotact admin.",
+			);
+
 		const passwordMatch = await this.utils.ensureHashMatchesText(
 			user.password,
 			body.password,

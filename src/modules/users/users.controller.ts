@@ -203,8 +203,14 @@ export class UsersController {
 	})
 	async activateUser(
 		@Param("userId") userId: string,
+		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: UserResponseDto }> {
-		const data = await this.usersService.activateUser(userId);
+		const { id: activatedBy, role: activatedByRole } = req.user;
+		const data = await this.usersService.activateUser(
+			userId,
+			activatedBy,
+			activatedByRole,
+		);
 
 		return {
 			message: "User activated successfully",
@@ -225,8 +231,14 @@ export class UsersController {
 	})
 	async deactivateUser(
 		@Param("userId") userId: string,
+		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: UserResponseDto }> {
-		const data = await this.usersService.deactivateUser(userId);
+		const { id: deactivatedBy, role: deactivatedByRole } = req.user;
+		const data = await this.usersService.deactivateUser(
+			userId,
+			deactivatedBy,
+			deactivatedByRole,
+		);
 
 		return {
 			message: "User deactivated successfully",

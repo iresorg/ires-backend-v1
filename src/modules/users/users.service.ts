@@ -14,6 +14,8 @@ import { IUserRepository } from "./interfaces/user-repo.interface";
 import constants from "./constants/constants";
 import { Utils } from "@/utils/utils";
 import { EmailService } from "@/shared/email/service";
+import { Logger } from "@/shared/logger/service";
+import { Role } from "./enums/role.enum";
 
 @Injectable()
 export class UsersService {
@@ -22,6 +24,7 @@ export class UsersService {
 		private usersRepository: IUserRepository,
 		private readonly utils: Utils,
 		private readonly emailService: EmailService,
+		private readonly logger: Logger,
 	) {}
 
 	async findAll(): Promise<IUser[]> {
@@ -98,22 +101,50 @@ export class UsersService {
 		return await this.usersRepository.delete(id);
 	}
 
-	async activateUser(userId: string): Promise<IUser> {
+	async activateUser(
+		userId: string,
+		activatedBy: string,
+		activatedByRole: Role,
+	): Promise<IUser> {
 		let user = await this.usersRepository.findById(userId);
 		if (!user) throw new UserNotFoundError();
 
 		user = await this.usersRepository.update(userId, { status: "active" });
 
+		this.logger.log(
+			`User ${user.email} activated by ${activatedBy} with role ${activatedByRole}`,
+			{
+				activatedUserId: userId,
+				activatedByUserId: activatedBy,
+				activatedByRole: activatedByRole,
+				timestamp: new Date().toISOString(),
+			},
+		);
+
 		return user;
 	}
 
-	async deactivateUser(userId: string): Promise<IUser> {
+	async deactivateUser(
+		userId: string,
+		deactivatedBy: string,
+		deactivatedByRole: Role,
+	): Promise<IUser> {
 		let user = await this.usersRepository.findById(userId);
 		if (!user) throw new UserNotFoundError();
 
 		user = await this.usersRepository.update(userId, {
 			status: "deactivated",
 		});
+
+		this.logger.log(
+			`User ${user.email} deactivated by ${deactivatedBy} with role ${deactivatedByRole}`,
+			{
+				deactivatedUserId: userId,
+				deactivatedByUserId: deactivatedBy,
+				deactivatedByRole: deactivatedByRole,
+				timestamp: new Date().toISOString(),
+			},
+		);
 
 		return user;
 	}
