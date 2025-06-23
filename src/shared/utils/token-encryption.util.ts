@@ -9,8 +9,14 @@ export class TokenEncryption {
 	private static readonly KEY_LENGTH = 32;
 	private static readonly SALT = "token-encryption-salt"; // Fixed salt for key derivation
 	private static encryptionKey: Buffer;
+	private static isInitialized = false;
 
 	static async initialize(configService: ConfigService<EnvVariables>) {
+		// Prevent multiple initializations
+		if (this.isInitialized) {
+			return;
+		}
+
 		const secret = configService.get<string>("JWT_TOKEN_SECRET");
 		if (!secret) {
 			throw new Error("JWT_TOKEN_SECRET is not defined");
@@ -21,9 +27,17 @@ export class TokenEncryption {
 			this.SALT,
 			this.KEY_LENGTH,
 		)) as Buffer;
+
+		this.isInitialized = true;
 	}
 
 	static encrypt(token: string): string {
+		if (!this.isInitialized || !this.encryptionKey) {
+			throw new Error(
+				"TokenEncryption not initialized. Call initialize() first.",
+			);
+		}
+
 		const iv = randomBytes(this.IV_LENGTH);
 		const cipher = createCipheriv(this.ALGORITHM, this.encryptionKey, iv);
 
@@ -38,6 +52,12 @@ export class TokenEncryption {
 	}
 
 	static decrypt(encryptedToken: string): string {
+		if (!this.isInitialized || !this.encryptionKey) {
+			throw new Error(
+				"TokenEncryption not initialized. Call initialize() first.",
+			);
+		}
+
 		const buffer = Buffer.from(encryptedToken, "base64");
 		const iv = buffer.subarray(0, this.IV_LENGTH);
 		const encryptedText = buffer.subarray(this.IV_LENGTH);
@@ -52,5 +72,9 @@ export class TokenEncryption {
 			decipher.final(),
 		]);
 		return decryptedText.toString("utf8");
+	}
+
+	static isReady(): boolean {
+		return this.isInitialized && !!this.encryptionKey;
 	}
 }
