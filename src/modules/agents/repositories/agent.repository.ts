@@ -38,12 +38,8 @@ export class AgentRepository implements IAgentRepository {
 		return this.repository.findOne({ where: { agentId } });
 	}
 
-	async findByEmail(email: string): Promise<IAgent | null> {
-		return this.repository.findOne({ where: { email } });
-	}
-
 	async update(agentId: string, data: IAgentUpdate): Promise<IAgent> {
-		const result = await this.repository.update(agentId, data);
+		const result = await this.repository.update({ agentId }, data);
 		if (result.affected === 0) {
 			throw new AgentNotFoundError(`Agent with id ${agentId} not found`);
 		}
@@ -57,7 +53,7 @@ export class AgentRepository implements IAgentRepository {
 	}
 
 	async delete(agentId: string): Promise<boolean> {
-		const result = await this.repository.delete(agentId);
+		const result = await this.repository.delete({ agentId });
 		if (result.affected === 0)
 			throw new AgentNotFoundError(`Agent with id ${agentId} not found.`);
 		return true;

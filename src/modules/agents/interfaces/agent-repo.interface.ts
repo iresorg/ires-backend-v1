@@ -7,7 +7,6 @@ import {
 
 export interface IAgentRepository {
 	findById(agentId: string): Promise<IAgent | null>;
-	findByEmail(email: string): Promise<IAgent | null>;
 	findAll(): Promise<IAgent[]>;
 	findActiveAgents(): Promise<IAgent[]>;
 	/**

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { QueueService } from "../service";
 import { ConfigService } from "@nestjs/config";
