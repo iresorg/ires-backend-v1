@@ -15,6 +15,18 @@ export class AgentResponseDto {
 	isActive: boolean;
 
 	@ApiProperty({
+		description: "The date when the agent was last seen",
+		example: "2024-03-20T10:00:00Z",
+	})
+	lastSeen: Date | null;
+
+	@ApiProperty({
+		description: "Whether the agent is online",
+		example: true,
+	})
+	isOnline: boolean;
+
+	@ApiProperty({
 		description: "The date when the agent was created",
 		example: "2024-03-20T10:00:00Z",
 	})
@@ -26,13 +38,21 @@ export class AgentResponseDto {
 	})
 	updatedAt: Date;
 
+	constructor(agent: IAgent) {
+		this.agentId = agent.agentId;
+		this.isActive = agent.isActive;
+		this.lastSeen = agent.lastSeen;
+		// Consider agent online if they were seen in the last 30 seconds
+		this.isOnline =
+			agent.isActive && agent.lastSeen
+				? new Date().getTime() - agent.lastSeen.getTime() <= 30000
+				: false;
+		this.createdAt = agent.createdAt;
+		this.updatedAt = agent.updatedAt;
+	}
+
 	static fromAgent(agent: IAgent): AgentResponseDto {
-		const dto = new AgentResponseDto();
-		dto.agentId = agent.agentId;
-		dto.isActive = agent.isActive;
-		dto.createdAt = agent.createdAt;
-		dto.updatedAt = agent.updatedAt;
-		return dto;
+		return new AgentResponseDto(agent);
 	}
 
 	static fromAgents(agents: IAgent[]): AgentResponseDto[] {

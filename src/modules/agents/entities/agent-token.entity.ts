@@ -14,7 +14,7 @@ export class AgentToken {
 	@PrimaryGeneratedColumn("uuid")
 	id: string;
 
-	@Column({ unique: true })
+	@Column({ type: "varchar", unique: true })
 	agentId: string;
 
 	@OneToOne(() => Agent)

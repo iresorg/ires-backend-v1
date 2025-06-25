@@ -11,6 +11,8 @@ import { AuthRequest } from "../interfaces/request.interface";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 import { AsyncContextService } from "../async-context/service";
+import { UsersService } from "@/modules/users/users.service";
+import { AgentsService } from "@/modules/agents/agents.service";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -18,9 +20,11 @@ export class AuthGuard implements CanActivate {
 		private readonly utils: Utils,
 		private reflector: Reflector,
 		private readonly asyncContextService: AsyncContextService,
+		private readonly usersService: UsersService,
+		private readonly agentsService: AgentsService,
 	) {}
 
-	canActivate(context: ExecutionContext): boolean {
+	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const isPublic = this.reflector.getAllAndOverride<boolean>(
 			IS_PUBLIC_KEY,
 			[context.getHandler(), context.getClass()],
@@ -38,16 +42,29 @@ export class AuthGuard implements CanActivate {
 
 		const payload = this.utils.verifyJWT<AuthPayload>(token);
 
-		request.user = payload;
-
-		this.asyncContextService.set("userId", payload.id);
+		if ("agentId" in payload) {
+			// This is an agent token
+			const agent = await this.agentsService.findOne(payload.agentId);
+			if (!agent) {
+				throw new UnauthorizedException("Agent not found");
+			}
+			request.user = { ...payload, type: "agent" };
+			this.asyncContextService.set("agent", agent);
+		} else {
+			// This is a user token
+			const user = await this.usersService.findOne({ id: payload.id });
+			if (!user) {
+				throw new UnauthorizedException("User not found");
+			}
+			request.user = { ...payload, type: "user" };
+			this.asyncContextService.set("user", user);
+		}
 
 		return true;
 	}
 
 	private extractTokenFromHeader(request: Request): string | null {
-		const [type, token] = request.headers.authorization.split(" ") ?? [];
-
+		const [type, token] = request.headers.authorization?.split(" ") ?? [];
 		return type === "Bearer" ? token : null;
 	}
 }

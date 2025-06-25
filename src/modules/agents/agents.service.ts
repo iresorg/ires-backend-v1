@@ -23,6 +23,9 @@ import { TokenEncryption } from "@/shared/utils/token-encryption.util";
 import { ConfigService } from "@nestjs/config";
 import { EnvVariables } from "@/utils/env.validate";
 import { Utils } from "@/utils/utils";
+import { Logger } from "@/shared/logger/service";
+import { AsyncContextService } from "@/shared/async-context/service";
+import { IUser } from "../users/interfaces/user.interface";
 
 @Injectable()
 export class AgentsService {
@@ -33,6 +36,8 @@ export class AgentsService {
 		private agentTokenRepository: IAgentTokenRepository,
 		private configService: ConfigService<EnvVariables>,
 		private utils: Utils,
+		private readonly logger: Logger,
+		private readonly asyncContext: AsyncContextService,
 	) {}
 
 	async create(): Promise<IAgent> {
@@ -41,8 +46,19 @@ export class AgentsService {
 			const agent = await this.agentRepository.create({
 				agentId,
 			});
+
+			const contextUser = this.asyncContext.get("user");
+			const user = contextUser as IUser;
+			this.logger.log("Agent created successfully", {
+				agentId,
+				createdBy: user?.email || "system",
+			});
+
 			return agent;
 		} catch (error) {
+			this.logger.error("Failed to create agent", {
+				error: error instanceof Error ? error.message : "Unknown error",
+			});
 			if (error instanceof AgentAlreadyExistsError) {
 				throw new ConflictException(
 					"Agent with this ID already exists.",
@@ -63,6 +79,7 @@ export class AgentsService {
 	async findOne(agentId: string): Promise<IAgent> {
 		const agent = await this.agentRepository.findById(agentId);
 		if (!agent) {
+			this.logger.error("Agent not found", { agentId });
 			throw new AgentNotFoundError(`Agent with ID ${agentId} not found`);
 		}
 		return agent;
@@ -76,8 +93,21 @@ export class AgentsService {
 			const updateData: IAgentUpdate = {
 				isActive: updateStatusDto.isActive,
 			};
-			return await this.agentRepository.update(agentId, updateData);
+			const agent = await this.agentRepository.update(
+				agentId,
+				updateData,
+			);
+			this.logger.log("Agent status updated", {
+				agentId,
+				isActive: updateStatusDto.isActive,
+			});
+			return agent;
 		} catch (error) {
+			this.logger.error("Failed to update agent status", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				agentId,
+				isActive: updateStatusDto.isActive,
+			});
 			if (error instanceof AgentNotFoundError) {
 				throw new NotFoundException("Agent not found.");
 			}
@@ -104,6 +134,7 @@ export class AgentsService {
 
 			// Ensure token encryption is initialized
 			if (!TokenEncryption.isReady()) {
+				this.logger.error("Token encryption service not ready");
 				throw new BadRequestException(
 					"Token encryption service is not ready. Please try again.",
 				);
@@ -125,8 +156,17 @@ export class AgentsService {
 				expiresAt: expirationDate,
 			});
 
+			this.logger.log("Token generated successfully", {
+				agentId,
+				expiresAt: expirationDate,
+			});
+
 			return token; // Return the original token to the client
 		} catch (error) {
+			this.logger.error("Failed to generate token", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				agentId,
+			});
 			if (
 				error instanceof BadRequestException ||
 				error instanceof ConflictException
