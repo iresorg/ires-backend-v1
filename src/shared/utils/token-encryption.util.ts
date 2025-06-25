@@ -1,29 +1,48 @@
-import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "crypto";
-import { promisify } from "util";
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import { EnvVariables } from "@/utils/env.validate";
+import { BadRequestException } from "@nestjs/common";
 
 export class TokenEncryption {
 	private static readonly ALGORITHM = "aes-256-ctr";
 	private static readonly IV_LENGTH = 16;
 	private static readonly KEY_LENGTH = 32;
-	private static readonly SALT = "token-encryption-salt"; // Fixed salt for key derivation
 	private static encryptionKey: Buffer;
+	private static isInitialized = false;
 
-	static async initialize(configService: ConfigService<EnvVariables>) {
-		const secret = configService.get<string>("JWT_TOKEN_SECRET");
-		if (!secret) {
-			throw new Error("JWT_TOKEN_SECRET is not defined");
+	static initialize(configService: ConfigService<EnvVariables>) {
+		if (this.isInitialized) {
+			return;
 		}
-		// Derive a 32-byte key using scrypt
-		this.encryptionKey = (await promisify(scrypt)(
-			secret,
-			this.SALT,
-			this.KEY_LENGTH,
-		)) as Buffer;
+
+		const encryptionKey = configService.get<string>("TOKEN_ENCRYPTION_KEY");
+		if (!encryptionKey) {
+			throw new Error(
+				"TOKEN_ENCRYPTION_KEY is not defined in environment variables",
+			);
+		}
+
+		if (encryptionKey.length !== this.KEY_LENGTH * 2) {
+			throw new Error(
+				"TOKEN_ENCRYPTION_KEY must be exactly 64 characters (32 bytes in hex)",
+			);
+		}
+
+		try {
+			this.encryptionKey = Buffer.from(encryptionKey, "hex");
+			this.isInitialized = true;
+		} catch {
+			throw new Error("TOKEN_ENCRYPTION_KEY must be a valid hex string");
+		}
 	}
 
 	static encrypt(token: string): string {
+		if (!this.isReady()) {
+			throw new BadRequestException(
+				"Token encryption service is not ready. Please try again.",
+			);
+		}
+
 		const iv = randomBytes(this.IV_LENGTH);
 		const cipher = createCipheriv(this.ALGORITHM, this.encryptionKey, iv);
 
@@ -32,12 +51,17 @@ export class TokenEncryption {
 			cipher.final(),
 		]);
 
-		// Combine IV and encrypted data
 		const result = Buffer.concat([iv, encryptedText]);
 		return result.toString("base64");
 	}
 
 	static decrypt(encryptedToken: string): string {
+		if (!this.isReady()) {
+			throw new BadRequestException(
+				"Token encryption service is not ready. Please try again.",
+			);
+		}
+
 		const buffer = Buffer.from(encryptedToken, "base64");
 		const iv = buffer.subarray(0, this.IV_LENGTH);
 		const encryptedText = buffer.subarray(this.IV_LENGTH);
@@ -52,5 +76,9 @@ export class TokenEncryption {
 			decipher.final(),
 		]);
 		return decryptedText.toString("utf8");
+	}
+
+	static isReady(): boolean {
+		return this.isInitialized && !!this.encryptionKey;
 	}
 }

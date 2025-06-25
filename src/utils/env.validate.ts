@@ -5,7 +5,7 @@ import {
 	IsNotEmpty,
 	IsNumber,
 	IsString,
-	IsUrl,
+	// IsUrl,
 	validateSync,
 } from "class-validator";
 
@@ -17,7 +17,6 @@ export enum Environment {
 
 export class EnvVariables {
 	@IsString()
-	
 	AMQP_URL: string;
 
 	@IsString()
@@ -59,6 +58,10 @@ export class EnvVariables {
 	@IsString()
 	@IsNotEmpty()
 	JWT_TOKEN_SECRET: string;
+
+	@IsString()
+	@IsNotEmpty()
+	TOKEN_ENCRYPTION_KEY: string;
 
 	@IsString()
 	@IsNotEmpty()

@@ -33,12 +33,7 @@ export class AgentsService {
 		private agentTokenRepository: IAgentTokenRepository,
 		private configService: ConfigService<EnvVariables>,
 		private utils: Utils,
-	) {
-		// Initialize token encryption
-		TokenEncryption.initialize(configService).catch((error) => {
-			console.error("Failed to initialize token encryption:", error);
-		});
-	}
+	) {}
 
 	async create(): Promise<IAgent> {
 		try {
@@ -107,6 +102,13 @@ export class AgentsService {
 				);
 			}
 
+			// Ensure token encryption is initialized
+			if (!TokenEncryption.isReady()) {
+				throw new BadRequestException(
+					"Token encryption service is not ready. Please try again.",
+				);
+			}
+
 			// Generate a random token
 			const token = Math.random().toString(36).substring(2, 15);
 			const tokenHash = await bcrypt.hash(token, 10);
@@ -159,8 +161,17 @@ export class AgentsService {
 		}
 
 		try {
+			// Ensure token encryption is initialized
+			if (!TokenEncryption.isReady()) {
+				console.warn(
+					"Token encryption not initialized when trying to decrypt token",
+				);
+				return null;
+			}
+
 			return TokenEncryption.decrypt(activeToken.encryptedToken);
-		} catch {
+		} catch (error) {
+			console.error("Failed to decrypt token:", error);
 			return null;
 		}
 	}
