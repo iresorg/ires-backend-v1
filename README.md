@@ -166,6 +166,12 @@ JWT_TOKEN_SECRET=your_jwt_secret_key_here_make_it_long_and_random
 REFRESH_TOKEN_SECRET=your_refresh_token_secret_key_here_make_it_long_and_random
 
 # =============================================================================
+# Token Encryption
+# =============================================================================
+# Generate this key using: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+TOKEN_ENCRYPTION_KEY=your_32_byte_hex_string_here
+
+# =============================================================================
 # Super Admin Default Configuration
 # =============================================================================
 DEFAULT_SUPER_ADMIN_EMAIL=admin@ires.com
@@ -180,6 +186,8 @@ DEFAULT_SUPER_ADMIN_LAST_NAME=Admin
 - Consider using a secrets management service for production
 - The seeder script will create a super admin user using the default values
 - Database will be automatically created if it doesn't exist (in development)
+- The `TOKEN_ENCRYPTION_KEY` must be a 32-byte (64 character) hex string. You can generate one using the Node.js command shown in the comments.
+- This key is used for encrypting agent tokens and must remain constant across server restarts to maintain token validity.
 
 ## API Documentation
 

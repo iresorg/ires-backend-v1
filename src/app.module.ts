@@ -1,5 +1,11 @@
-import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import {
+	MiddlewareConsumer,
+	Module,
+	NestModule,
+	OnModuleInit,
+	Inject,
+} from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { validateEnv } from "./utils/env.validate";
@@ -13,6 +19,28 @@ import { LoggerModule } from "./shared/logger/module";
 import { Logger } from "./shared/logger/service";
 import { QueueModule } from "./shared/queue/module";
 import { EmailModule } from "./shared/email/module";
+import { TokenEncryption } from "./shared/utils/token-encryption.util";
+import { EnvVariables } from "./utils/env.validate";
+
+class TokenEncryptionInitializer implements OnModuleInit {
+	constructor(
+		@Inject(ConfigService)
+		private readonly configService: ConfigService<EnvVariables>,
+	) {}
+
+	onModuleInit() {
+		try {
+			TokenEncryption.initialize(this.configService);
+			console.log("Token encryption service initialized successfully");
+		} catch (error) {
+			console.error(
+				"Failed to initialize token encryption service. Ensure TOKEN_ENCRYPTION_KEY is properly set in environment variables.",
+				error,
+			);
+			throw error;
+		}
+	}
+}
 
 @Module({
 	imports: [
@@ -31,6 +59,7 @@ import { EmailModule } from "./shared/email/module";
 		EmailModule,
 		QueueModule,
 	],
+	providers: [TokenEncryptionInitializer],
 })
 export class AppModule implements NestModule {
 	constructor(private readonly logger: Logger) {}
