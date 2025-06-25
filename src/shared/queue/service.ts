@@ -113,8 +113,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
-	acknowledgeMessage(message: amqp.ConsumeMessage) {
+	ack(message: amqp.ConsumeMessage): void {
 		this.channel.ack(message);
+	}
+
+	nack(message: amqp.ConsumeMessage, requeue = false): void {
+		this.channel.nack(message, false, requeue);
 	}
 
 	async sendToQueue(queueName: string, message: unknown) {

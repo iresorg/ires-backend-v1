@@ -11,6 +11,7 @@ import { AuthRequest } from "../interfaces/request.interface";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 import { AsyncContextService } from "../async-context/service";
+import { UsersService } from "@/modules/users/users.service";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -18,9 +19,10 @@ export class AuthGuard implements CanActivate {
 		private readonly utils: Utils,
 		private reflector: Reflector,
 		private readonly asyncContextService: AsyncContextService,
+		private readonly usersService: UsersService,
 	) {}
 
-	canActivate(context: ExecutionContext): boolean {
+	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const isPublic = this.reflector.getAllAndOverride<boolean>(
 			IS_PUBLIC_KEY,
 			[context.getHandler(), context.getClass()],
@@ -37,17 +39,16 @@ export class AuthGuard implements CanActivate {
 		}
 
 		const payload = this.utils.verifyJWT<AuthPayload>(token);
+		const user = await this.usersService.findOne({ id: payload.id });
 
 		request.user = payload;
-
-		this.asyncContextService.set("userId", payload.id);
+		this.asyncContextService.set("user", user);
 
 		return true;
 	}
 
 	private extractTokenFromHeader(request: Request): string | null {
-		const [type, token] = request.headers.authorization.split(" ") ?? [];
-
+		const [type, token] = request.headers.authorization?.split(" ") ?? [];
 		return type === "Bearer" ? token : null;
 	}
 }
