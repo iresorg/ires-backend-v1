@@ -34,6 +34,10 @@ export class AgentRepository implements IAgentRepository {
 		return this.repository.find({ where: { isActive: true } });
 	}
 
+	async findOnlineAgents(): Promise<IAgent[]> {
+		return this.repository.find({ where: { isOnline: true } });
+	}
+
 	async findById(agentId: string): Promise<IAgent | null> {
 		return this.repository.findOne({ where: { agentId } });
 	}

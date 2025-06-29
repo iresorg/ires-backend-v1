@@ -4,4 +4,4 @@ export class UpdateAgentDto {
 	@IsBoolean()
 	@IsOptional()
 	isActive?: boolean;
-} 
+}

@@ -1,4 +1,5 @@
 import { Role } from "@/modules/users/enums/role.enum";
+import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
 export interface UserAuthPayload {
 	id: string;
@@ -14,4 +15,11 @@ export interface AgentAuthPayload {
 	type: "agent";
 }
 
-export type AuthPayload = UserAuthPayload | AgentAuthPayload;
+export interface ResponderAuthPayload {
+	id: string;
+	role: Role;
+	responderId: string;
+	type: ResponderType;
+}
+
+export type AuthPayload = UserAuthPayload | AgentAuthPayload | ResponderAuthPayload;

@@ -9,6 +9,7 @@ export interface IAgentRepository {
 	findById(agentId: string): Promise<IAgent | null>;
 	findAll(): Promise<IAgent[]>;
 	findActiveAgents(): Promise<IAgent[]>;
+	findOnlineAgents(): Promise<IAgent[]>;
 	/**
 	 * @throws {AgentAlreadyExistsError}
 	 */

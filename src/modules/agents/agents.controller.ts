@@ -98,6 +98,10 @@ export class AgentsController {
 		description: "Agent details",
 		type: AgentResponseDto,
 	})
+	@ApiResponse({
+		status: 404,
+		description: "Agent not found",
+	})
 	async findOne(
 		@Param("id") id: string,
 	): Promise<{ message: string; data: AgentResponseDto }> {
@@ -116,6 +120,10 @@ export class AgentsController {
 		status: 200,
 		description: "Agent status updated successfully",
 		type: AgentResponseDto,
+	})
+	@ApiResponse({
+		status: 404,
+		description: "Agent not found",
 	})
 	async updateStatus(
 		@Param("id") id: string,
@@ -139,6 +147,10 @@ export class AgentsController {
 		status: 201,
 		description: "Agent token generated successfully",
 	})
+	@ApiResponse({
+		status: 404,
+		description: "Agent not found",
+	})
 	async generateToken(
 		@Param("id") id: string,
 		@Body() generateTokenDto: GenerateTokenDto,
@@ -160,6 +172,10 @@ export class AgentsController {
 		status: 200,
 		description: "Agent token revoked successfully",
 	})
+	@ApiResponse({
+		status: 404,
+		description: "Agent not found",
+	})
 	async revokeToken(@Param("id") id: string): Promise<{ message: string }> {
 		await this.agentsService.revokeToken(id);
 		return {
@@ -180,6 +196,10 @@ export class AgentsController {
 				message: { type: "string" },
 			},
 		},
+	})
+	@ApiResponse({
+		status: 404,
+		description: "Agent not found",
 	})
 	async getToken(
 		@Param("id") id: string,

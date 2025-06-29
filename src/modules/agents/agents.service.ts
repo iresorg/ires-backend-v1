@@ -26,6 +26,8 @@ import { Utils } from "@/utils/utils";
 import { Logger } from "@/shared/logger/service";
 import { AsyncContextService } from "@/shared/async-context/service";
 import { IUser } from "../users/interfaces/user.interface";
+import { QueueService } from "@/shared/queue/service";
+import { AGENT_STATUS_QUEUE } from "@/shared/queue/consumers/agent-status.consumer";
 
 @Injectable()
 export class AgentsService {
@@ -38,6 +40,7 @@ export class AgentsService {
 		private utils: Utils,
 		private readonly logger: Logger,
 		private readonly asyncContext: AsyncContextService,
+		private readonly queueService: QueueService,
 	) {}
 
 	async create(): Promise<IAgent> {
@@ -52,6 +55,13 @@ export class AgentsService {
 			this.logger.log("Agent created successfully", {
 				agentId,
 				createdBy: user?.email || "system",
+			});
+
+			// Send initial status to queue
+			await this.queueService.sendToQueue(AGENT_STATUS_QUEUE, {
+				agentId,
+				status: "offline",
+				timestamp: new Date().toISOString(),
 			});
 
 			return agent;
@@ -76,11 +86,15 @@ export class AgentsService {
 		return this.agentRepository.findActiveAgents();
 	}
 
+	async findOnlineAgents(): Promise<IAgent[]> {
+		return this.agentRepository.findOnlineAgents();
+	}
+
 	async findOne(agentId: string): Promise<IAgent> {
 		const agent = await this.agentRepository.findById(agentId);
 		if (!agent) {
 			this.logger.error("Agent not found", { agentId });
-			throw new AgentNotFoundError(`Agent with ID ${agentId} not found`);
+			throw new NotFoundException("Agent not found.");
 		}
 		return agent;
 	}
@@ -97,10 +111,12 @@ export class AgentsService {
 				agentId,
 				updateData,
 			);
+
 			this.logger.log("Agent status updated", {
 				agentId,
-				isActive: updateStatusDto.isActive,
+				...updateData,
 			});
+
 			return agent;
 		} catch (error) {
 			this.logger.error("Failed to update agent status", {
@@ -203,15 +219,19 @@ export class AgentsService {
 		try {
 			// Ensure token encryption is initialized
 			if (!TokenEncryption.isReady()) {
-				console.warn(
+				this.logger.warn(
 					"Token encryption not initialized when trying to decrypt token",
+					{ agentId },
 				);
 				return null;
 			}
 
 			return TokenEncryption.decrypt(activeToken.encryptedToken);
 		} catch (error) {
-			console.error("Failed to decrypt token:", error);
+			this.logger.error("Failed to decrypt token", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				agentId,
+			});
 			return null;
 		}
 	}
@@ -219,11 +239,33 @@ export class AgentsService {
 	async revokeToken(agentId: string): Promise<void> {
 		try {
 			await this.agentTokenRepository.revokeToken(agentId);
+			this.logger.log("Token revoked for agent", { agentId });
 		} catch (error) {
+			this.logger.error("Failed to revoke token", {
+				error: error instanceof Error ? error.message : "Unknown error",
+				agentId,
+			});
 			if (error instanceof AgentNotFoundError) {
 				throw new NotFoundException("Agent not found.");
 			}
 			throw error;
 		}
+	}
+
+	// Internal method for queue/consumer updates
+	async updateStatusFromConsumer(
+		agentId: string,
+		update: {
+			isOnline?: boolean;
+			lastSeen?: Date;
+			lastStatusChangeAt?: Date;
+		},
+	): Promise<IAgent> {
+		const agent = await this.agentRepository.update(agentId, update);
+		this.logger.log("Agent status updated from consumer", {
+			agentId,
+			...update,
+		});
+		return agent;
 	}
 }

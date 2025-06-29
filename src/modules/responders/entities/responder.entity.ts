@@ -1,9 +1,17 @@
 import { Column, CreateDateColumn, Entity, UpdateDateColumn } from "typeorm";
+import { ResponderType } from "../enums/responder-type.enum";
 
-@Entity("agents")
-export class Agent {
+@Entity("responders")
+export class Responder {
 	@Column({ primary: true, type: "varchar", unique: true })
-	agentId: string;
+	responderId: string;
+
+	@Column({
+		type: "varchar",
+		enum: ResponderType,
+		default: ResponderType.TIER1,
+	})
+	type: ResponderType;
 
 	@Column({ default: true })
 	isActive: boolean;

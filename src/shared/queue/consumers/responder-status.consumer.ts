@@ -1,45 +1,47 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { forwardRef, Inject, Injectable, OnModuleInit } from "@nestjs/common";
-import { QueueService } from "../service";
-import { AgentsService } from "@/modules/agents/agents.service";
 import { Logger } from "@/shared/logger/service";
+import { RespondersService } from "@/modules/responders/responders.service";
+import { QueueService } from "../service";
 import { ConsumeMessage } from "amqplib";
-import { AgentStatusMessageDto, StatusType } from "./dto/status-message.dto";
+import {
+	ResponderStatusMessageDto,
+	StatusType,
+} from "./dto/status-message.dto";
 import { validateSync } from "class-validator";
 import { plainToInstance } from "class-transformer";
 
-export const AGENT_STATUS_QUEUE = "agent_status";
+export const RESPONDER_STATUS_QUEUE = "responder-status";
 
 type MessageHandler = (message: ConsumeMessage) => Promise<void>;
 
 @Injectable()
-export class AgentStatusConsumer implements OnModuleInit {
+export class ResponderStatusConsumer implements OnModuleInit {
 	constructor(
-		private readonly queueService: QueueService,
-		@Inject(forwardRef(() => AgentsService))
-		private readonly agentsService: AgentsService,
+		@Inject(forwardRef(() => RespondersService))
+		private readonly respondersService: RespondersService,
 		private readonly logger: Logger,
+		private readonly queueService: QueueService,
 	) {}
 
 	async onModuleInit() {
 		try {
-			const handler: MessageHandler = this.handleMessage.bind(this);
+			const handler = this.handleMessage.bind(this) as MessageHandler;
 			await this.queueService.registerConsumer(
-				AGENT_STATUS_QUEUE,
+				RESPONDER_STATUS_QUEUE,
 				handler,
 			);
 			this.logger.log(
-				"Agent status queue consumer registered successfully",
+				"Responder status queue consumer registered successfully",
 			);
 		} catch (error) {
-			this.logger.error("Failed to register agent status consumer", {
+			this.logger.error("Failed to register responder status consumer", {
 				error: error instanceof Error ? error.message : "Unknown error",
 			});
 		}
 	}
 
-	private validateMessage(data: unknown): AgentStatusMessageDto {
-		const messageDto = plainToInstance(AgentStatusMessageDto, data);
+	private validateMessage(data: unknown): ResponderStatusMessageDto {
+		const messageDto = plainToInstance(ResponderStatusMessageDto, data);
 		const errors = validateSync(messageDto);
 
 		if (errors.length > 0) {
@@ -61,19 +63,21 @@ export class AgentStatusConsumer implements OnModuleInit {
 
 			const data = this.validateMessage(rawData);
 
-			// First check if agent exists and is active
-			const agent = await this.agentsService.findOne(data.agentId);
-			if (!agent) {
-				this.logger.warn("Agent not found for status update", {
-					agentId: data.agentId,
+			// First check if responder exists and is active
+			const responder = await this.respondersService.findOne(
+				data.responderId,
+			);
+			if (!responder) {
+				this.logger.warn("Responder not found for status update", {
+					responderId: data.responderId,
 				});
 				this.queueService.nack(message, false);
 				return;
 			}
 
-			if (!agent.isActive) {
-				this.logger.warn("Inactive agent trying to update status", {
-					agentId: data.agentId,
+			if (!responder.isActive) {
+				this.logger.warn("Inactive responder trying to update status", {
+					responderId: data.responderId,
 				});
 				this.queueService.nack(message, false);
 				return;
@@ -81,18 +85,21 @@ export class AgentStatusConsumer implements OnModuleInit {
 
 			// Check if status is actually changing
 			const isOnline = data.isOnline ?? data.status === StatusType.ONLINE;
-			const isStatusChanging = agent.isOnline !== isOnline;
+			const isStatusChanging = responder.isOnline !== isOnline;
 			const now = new Date();
 
 			// Update both isOnline and lastSeen for better status tracking
-			await this.agentsService.updateStatusFromConsumer(data.agentId, {
-				isOnline: isOnline,
-				lastSeen: new Date(data.timestamp),
-				lastStatusChangeAt: isStatusChanging ? now : undefined,
-			});
+			await this.respondersService.updateStatusFromConsumer(
+				data.responderId,
+				{
+					isOnline: isOnline,
+					lastSeen: new Date(data.timestamp),
+					lastStatusChangeAt: isStatusChanging ? now : undefined,
+				},
+			);
 
-			this.logger.log("Agent status updated successfully", {
-				agentId: data.agentId,
+			this.logger.log("Responder status updated successfully", {
+				responderId: data.responderId,
 				status: data.status,
 				timestamp: data.timestamp,
 				isOnline: isOnline,
@@ -101,7 +108,7 @@ export class AgentStatusConsumer implements OnModuleInit {
 
 			this.queueService.ack(message);
 		} catch (error) {
-			this.logger.error("Failed to process agent status message", {
+			this.logger.error("Failed to process responder status message", {
 				error: error instanceof Error ? error.message : "Unknown error",
 				messageContent: message.content.toString(),
 			});
