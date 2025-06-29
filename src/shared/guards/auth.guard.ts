@@ -13,6 +13,7 @@ import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 import { AsyncContextService } from "../async-context/service";
 import { UsersService } from "@/modules/users/users.service";
 import { AgentsService } from "@/modules/agents/agents.service";
+import { RespondersService } from "@/modules/responders/responders.service";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -22,6 +23,7 @@ export class AuthGuard implements CanActivate {
 		private readonly asyncContextService: AsyncContextService,
 		private readonly usersService: UsersService,
 		private readonly agentsService: AgentsService,
+		private readonly respondersService: RespondersService,
 	) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -50,6 +52,16 @@ export class AuthGuard implements CanActivate {
 			}
 			request.user = { ...payload, type: "agent" };
 			this.asyncContextService.set("agent", agent);
+		} else if ("responderId" in payload) {
+			// This is a responder token
+			const responder = await this.respondersService.findOne(
+				payload.responderId,
+			);
+			if (!responder) {
+				throw new UnauthorizedException("Responder not found");
+			}
+			request.user = payload;
+			this.asyncContextService.set("responder", responder);
 		} else {
 			// This is a user token
 			const user = await this.usersService.findOne({ id: payload.id });

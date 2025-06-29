@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { User } from "../../modules/users/entities/user.entity";
 import { Agent } from "../../modules/agents/entities/agent.entity";
 import { AgentToken } from "../../modules/agents/entities/agent-token.entity";
+import { Responder } from "../../modules/responders/entities/responder.entity";
+import { ResponderToken } from "../../modules/responders/entities/responder-token.entity";
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Environment, EnvVariables, validateEnv } from "@/utils/env.validate";
@@ -21,7 +23,9 @@ export function createDataSourceOptions(
 		username: config.DB_USER,
 		password: config.DB_PASS,
 		database: config.DB_NAME,
-		entities: [User, Agent, AgentToken],
+		entities: [User, Agent, AgentToken, Responder, ResponderToken],
+		migrations: ["src/shared/database/migrations/*.ts"],
+		migrationsTableName: "migrations",
 		synchronize: config.NODE_ENV !== Environment.Production,
 		logging: false,
 	};

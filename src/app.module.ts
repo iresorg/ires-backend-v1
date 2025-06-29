@@ -13,6 +13,7 @@ import { UtilsModule } from "./utils/utils.module";
 import { JwtProviderModule } from "./shared/jwt.module";
 import { DatabaseModule } from "./shared/database/datasource";
 import { AgentsModule } from "./modules/agents/agents.module";
+import { RespondersModule } from "./modules/responders/responders.module";
 import { AsyncContextMiddleware } from "./shared/async-context/middleware";
 import { AsyncContextModule } from "./shared/async-context/module";
 import { LoggerModule } from "./shared/logger/module";
@@ -54,6 +55,7 @@ class TokenEncryptionInitializer implements OnModuleInit {
 		UsersModule,
 		UtilsModule,
 		AgentsModule,
+		RespondersModule,
 		AsyncContextModule,
 		LoggerModule,
 		EmailModule,

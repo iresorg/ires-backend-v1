@@ -1,5 +1,8 @@
-export interface IAgent {
-	agentId: string;
+import { ResponderType } from "../enums/responder-type.enum";
+
+export interface IResponder {
+	responderId: string;
+	type: ResponderType;
 	isActive: boolean;
 	isOnline: boolean;
 	lastSeen: Date | null;
@@ -8,23 +11,25 @@ export interface IAgent {
 	updatedAt: Date;
 }
 
-export interface IAgentCreate {
-	agentId: string;
+export interface IResponderCreate {
+	responderId: string;
+	type: ResponderType;
 	lastSeen?: Date | null;
 }
 
-export interface IAgentUpdate {
+export interface IResponderUpdate {
+	type?: ResponderType;
 	isActive?: boolean;
 	isOnline?: boolean;
 	lastSeen?: Date | null;
 	lastStatusChangeAt?: Date | null;
 }
 
-export type IAgentFind = IAgent;
+export type IResponderFind = IResponder;
 
-export interface IAgentToken {
+export interface IResponderToken {
 	tokenHash: string;
-	agentId: string;
+	responderId: string;
 	expiresAt: Date;
 	isRevoked: boolean;
 	createdAt: Date;
@@ -32,8 +37,8 @@ export interface IAgentToken {
 	encryptedToken: string;
 }
 
-export interface IAgentTokenCreate {
-	agentId: string;
+export interface IResponderTokenCreate {
+	responderId: string;
 	tokenHash: string;
 	encryptedToken: string;
 	expiresAt: Date;
