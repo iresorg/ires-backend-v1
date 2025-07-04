@@ -10,6 +10,8 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Environment, EnvVariables, validateEnv } from "@/utils/env.validate";
 import "dotenv/config";
+import { Tickets } from "@/modules/tickets/entities/ticket.entity";
+import { TicketLifecycle } from "@/modules/tickets/entities/ticket-lifecycle.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -23,7 +25,15 @@ export function createDataSourceOptions(
 		username: config.DB_USER,
 		password: config.DB_PASS,
 		database: config.DB_NAME,
-		entities: [User, Agent, AgentToken, Responder, ResponderToken],
+		entities: [
+			User,
+			Agent,
+			AgentToken,
+			Responder,
+			ResponderToken,
+			Tickets,
+			TicketLifecycle,
+		],
 		migrations: ["src/shared/database/migrations/*.ts"],
 		migrationsTableName: "migrations",
 		synchronize: config.NODE_ENV !== Environment.Production,

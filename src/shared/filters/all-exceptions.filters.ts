@@ -39,7 +39,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 		});
 
 		response.status(status).json({
-			message,
+			message:
+				status >= HttpStatus.INTERNAL_SERVER_ERROR
+					? "Something went wrong"
+					: message,
 			error: true,
 			timestamp: new Date().toISOString(),
 		});

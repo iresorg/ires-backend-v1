@@ -7,11 +7,9 @@ import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filters";
 import { Logger } from "./shared/logger/service";
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule, {
-		bufferLogs: true,
-	});
+	const app = await NestFactory.create(AppModule);
 	const logger = await app.resolve(Logger);
-	app.useLogger(logger);
+	// app.useLogger(logger);
 
 	// Security middleware
 	app.use(

@@ -42,6 +42,7 @@ class TokenEncryptionInitializer implements OnModuleInit {
 		}
 	}
 }
+import { TicketsModule } from "./modules/tickets/module";
 
 @Module({
 	imports: [
@@ -60,6 +61,7 @@ class TokenEncryptionInitializer implements OnModuleInit {
 		LoggerModule,
 		EmailModule,
 		QueueModule,
+		TicketsModule,
 	],
 	providers: [TokenEncryptionInitializer],
 })
