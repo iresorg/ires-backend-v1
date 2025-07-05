@@ -2,7 +2,7 @@ import { templates } from "../queue/consumers/email.consumer";
 
 export interface EmailPayload<T = TemplateName> {
 	from: string;
-	to: string;
+	to: string | string[];
 	subject: string;
 	template: T;
 	options: T extends TemplateName

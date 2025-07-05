@@ -17,6 +17,8 @@ import { AgentsService } from "@/modules/agents/agents.service";
 import { RespondersService } from "@/modules/responders/responders.service";
 import { AgentNotFoundError, UserNotFoundError } from "@/shared/errors";
 import { ResponderNotFoundError } from "@/shared/errors/responder.errors";
+import { EmailService } from "@/shared/email/service";
+import { Role } from "../users/enums/role.enum";
 
 @Injectable()
 export class TicketsService {
@@ -26,18 +28,41 @@ export class TicketsService {
 		private readonly usersService: UsersService,
 		private readonly agentsService: AgentsService,
 		private readonly respondersService: RespondersService,
+		private readonly emailService: EmailService,
 	) {}
 
 	async createTicket(
 		body: Omit<ITicketCreate, "ticketId">,
 	): Promise<ITicket> {
-		const ticketId = this.generateTicketId();
-		const ticketCreateObj = { ...body, ticketId };
 		await this.validateActor(body.actorType, body.actorId);
-		const ticket =
-			await this.ticketsRepository.createTicket(ticketCreateObj);
+		const ticketId = this.generateTicketId();
+		const ticket = await this.ticketsRepository.createTicket({
+			...body,
+			ticketId,
+		});
+		const savedTicket = await this.ticketsRepository.getTicketById(
+			ticket.ticketId,
+		);
+		const responderAdmins = await this.usersService.findAll({
+			role: Role.RESPONDER_ADMIN,
+		});
 
-		return this.ticketsRepository.getTicketById(ticket.ticketId);
+		if (responderAdmins.length) {
+			await this.emailService.sendNewTicketEmail(
+				responderAdmins.map((admin) => admin.email),
+				savedTicket.description,
+				{
+					id: savedTicket.createdBy.id,
+					name: savedTicket.createdBy.name,
+					role: savedTicket.createdBy.role,
+				},
+				savedTicket.ticketId,
+				savedTicket.title,
+				savedTicket.createdAt.toUTCString(),
+			);
+		}
+
+		return savedTicket;
 	}
 
 	async validateActor(

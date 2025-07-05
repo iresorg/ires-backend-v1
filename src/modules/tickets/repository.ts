@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, DeepPartial } from "typeorm";
+import { Repository, DataSource, QueryRunner } from "typeorm";
 import { Tickets } from "./entities/ticket.entity";
 import { ITicketRepository } from "./interfaces/ticket-repo.interface";
 import {
