@@ -26,6 +26,9 @@ import {
 	CloseTicketDto,
 } from "./dto/update-ticket.dto";
 import { AuthGuard } from "@/shared/guards/auth.guard";
+import { Role } from "../users/enums/role.enum";
+import { Roles } from "@/shared/decorators/role.decorator";
+import { RoleGuard } from "@/shared/guards/roles.guard";
 
 @UseGuards(AuthGuard)
 @Controller("tickets")
@@ -92,9 +95,11 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.ESCALATED,
 			ticketId,
 			{ status: TicketStatus.ESCALATED },
 			req.user.id,
+			req.user.role,
 			{
 				escalationReason: body.escalationReason,
 				escalatedToUserId: body.escalatedToUserId,
@@ -107,6 +112,7 @@ export class TicketsController {
 	@ApiOperation({ summary: "Assign a responder to a ticket" })
 	@ApiResponse({ status: 200, description: "Ticket assigned" })
 	@ApiBody({ type: AssignTicketDto })
+	@Roles(Role.RESPONDER_ADMIN, Role.SUPER_ADMIN)
 	@Patch(":ticketId/assign")
 	async assignTicket(
 		@Param("ticketId") ticketId: string,
@@ -114,9 +120,15 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.ASSIGNED,
 			ticketId,
-			{ status: TicketStatus.ASSIGNED },
+			{
+				status: TicketStatus.ASSIGNED,
+				tier: body.tier,
+				severity: body.severity,
+			},
 			req.user.id,
+			req.user.role,
 			{
 				assignedResponderId: body.assignedResponderId,
 				notes: body.notes,
@@ -128,6 +140,8 @@ export class TicketsController {
 	@ApiOperation({ summary: "Start analysing a ticket" })
 	@ApiResponse({ status: 200, description: "Ticket moved to analysing" })
 	@ApiBody({ type: StartAnalysisDto })
+	@UseGuards(RoleGuard)
+	@Roles(Role.RESPONDER_ADMIN, Role.SUPER_ADMIN)
 	@Patch(":ticketId/start-analysis")
 	async startAnalysis(
 		@Param("ticketId") ticketId: string,
@@ -135,9 +149,11 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.ANALYSING,
 			ticketId,
 			{ status: TicketStatus.ANALYSING },
 			req.user.id,
+			req.user.role,
 			{ notes: body.notes },
 		);
 		return { message: "Ticket moved to analysing", data: updated };
@@ -153,9 +169,11 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.RESPONDING,
 			ticketId,
 			{ status: TicketStatus.RESPONDING },
 			req.user.id,
+			req.user.role,
 			{ notes: body.notes },
 		);
 		return { message: "Ticket moved to responding", data: updated };
@@ -171,9 +189,11 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.RESOLVED,
 			ticketId,
 			{ status: TicketStatus.RESOLVED },
 			req.user.id,
+			req.user.role,
 			{ notes: body.notes },
 		);
 		return { message: "Ticket resolved", data: updated };
@@ -189,9 +209,11 @@ export class TicketsController {
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const updated = await this.ticketsService.updateTicket(
+			TicketStatus.CLOSED,
 			ticketId,
 			{ status: TicketStatus.CLOSED },
 			req.user.id,
+			req.user.role,
 			{ notes: body.notes },
 		);
 		return { message: "Ticket closed", data: updated };

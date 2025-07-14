@@ -26,3 +26,12 @@ export class TicketUpdateError extends HttpException {
 		this.name = "TicketUpdateError";
 	}
 }
+
+export class InappropriateTierError extends HttpException {
+	constructor(message: string = "Inappropriate tier") {
+		super(message, HttpStatus.BAD_REQUEST, {
+			description: message,
+		});
+		this.name = "InappropriateTierError";
+	}
+}

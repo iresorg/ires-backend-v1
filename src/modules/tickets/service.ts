@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import {
 	ITicket,
 	ITicketCreate,
@@ -12,6 +12,7 @@ import { UsersService } from "@/modules/users/users.service";
 import {
 	TicketNotFoundError,
 	TicketEscalationReasonRequiredError,
+	InappropriateTierError,
 } from "@/shared/errors/ticket.errors";
 import { AgentsService } from "@/modules/agents/agents.service";
 import { RespondersService } from "@/modules/responders/responders.service";
@@ -53,7 +54,7 @@ export class TicketsService {
 				savedTicket.description,
 				{
 					id: savedTicket.createdBy.id,
-					name: savedTicket.createdBy.name,
+					name: `${savedTicket.createdBy.firstName} ${savedTicket.createdBy.lastName}`,
 					role: savedTicket.createdBy.role,
 				},
 				savedTicket.ticketId,
@@ -89,7 +90,10 @@ export class TicketsService {
 	}
 
 	async getTicketById(ticketId: string): Promise<ITicket | null> {
-		return this.ticketsRepository.getTicketById(ticketId);
+		const ticket = await this.ticketsRepository.getTicketById(ticketId);
+		if (!ticket) throw new TicketNotFoundError();
+
+		return ticket;
 	}
 
 	async getTickets(): Promise<ITicket[]> {
@@ -104,9 +108,11 @@ export class TicketsService {
 	 * @param context Optional context: { notes, assignedResponderId, escalationReason, escalatedToUserId }
 	 */
 	async updateTicket(
+		action: TicketStatus,
 		ticketId: string,
 		updateBody: Partial<ITicket>,
 		performedBy: string,
+		performerRole: Role,
 		context?: {
 			notes?: string;
 			assignedResponderId?: string;
@@ -128,16 +134,63 @@ export class TicketsService {
 			throw new TicketEscalationReasonRequiredError();
 		}
 
-		const result = await this.ticketsRepository.updateTicket(
+		if (context.assignedResponderId) {
+			const responder = await this.respondersService.findOne(
+				context.assignedResponderId,
+			);
+
+			if (!responder) throw new ResponderNotFoundError();
+
+			if (responder.type !== updateBody.tier) {
+				throw new InappropriateTierError(
+					"Tier selected does not tally with responder selected.",
+				);
+			}
+		}
+
+		if (action === TicketStatus.RESPONDING) {
+			if (existing.assignedResponder.id !== performedBy) {
+				const e = new UnauthorizedException(
+					"Only assigned responder can respond to this ticket",
+				);
+				e.name = "UnauthorisedResponderError";
+
+				throw e;
+			}
+		}
+
+		const updatedTicket = await this.ticketsRepository.updateTicket(
 			existing,
 			updateBody,
-			performedBy,
+			action,
+			performerRole,
+			performerRole === Role.RESPONDER
+				? { responderId: performedBy }
+				: performerRole === Role.AGENT
+					? { agentId: performedBy }
+					: { userId: performedBy },
 			context,
 		);
-		if (!result) {
+		if (!updatedTicket) {
 			throw new TicketNotFoundError();
 		}
-		return result;
+		if (updateBody.status === TicketStatus.ESCALATED) {
+			// Send a mail to responder admin
+			const responderAdmin = await this.usersService.findAll({
+				role: Role.RESPONDER_ADMIN,
+			});
+			await this.emailService.sendTicketEscalatedEmail(
+				responderAdmin.map((admin) => admin.email),
+				{
+					escalatedBy: performedBy,
+					escalationReason: context.escalationReason,
+					subject: updatedTicket.title,
+					ticketId: updatedTicket.ticketId,
+					timestamp: updatedTicket.createdAt.toLocaleString(),
+				},
+			);
+		}
+		return updatedTicket;
 	}
 
 	async getTicketLifecycle(ticketId: string): Promise<ITicketLifecycle[]> {

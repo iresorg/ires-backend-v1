@@ -1,5 +1,8 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { TicketSeverity } from "../interfaces/ticket.interface";
+import { Transform } from "class-transformer";
+import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
 export class EscalateTicketDto {
 	@ApiProperty({
@@ -33,6 +36,21 @@ export class AssignTicketDto {
 	})
 	@IsString()
 	assignedResponderId: string;
+
+	@ApiProperty({
+		description:
+			"What tier the ticket belongs to. Reasonably the tier of the repsonder.",
+		required: true,
+	})
+	@IsEnum(ResponderType)
+	tier: ResponderType;
+
+	@ApiProperty({
+		description: "Severity or ungency level of the ticket.",
+		required: true,
+	})
+	@IsEnum(TicketSeverity)
+	severity: TicketSeverity;
 
 	@ApiProperty({
 		description: "Internal notes for assignment",

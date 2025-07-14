@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { EmailConsumer } from "../queue/consumers/email.consumer";
 import { EmailPayload } from "./types";
 import { Role } from "@/modules/users/enums/role.enum";
+import { TicketEscalateParams } from "./templates/TicketEscalated";
 
 @Injectable()
 export class EmailService {
@@ -48,6 +49,31 @@ export class EmailService {
 				submittedBy,
 				ticketId,
 				title,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendTicketEscalatedEmail(
+		email: string[],
+		escalationDetails: Omit<TicketEscalateParams, "headerText">,
+	) {
+		const { escalatedBy, escalationReason, subject, ticketId, timestamp } =
+			escalationDetails;
+
+		const payload: EmailPayload<"TicketEscalated"> = {
+			to: email,
+			from: "support@ires.co",
+			subject: "Ticket Escalated: Action Required",
+			template: "TicketEscalated",
+			options: {
+				timestamp,
+				escalatedBy,
+				headerText: "Action Required",
+				ticketId,
+				subject,
+				escalationReason,
 			},
 		};
 

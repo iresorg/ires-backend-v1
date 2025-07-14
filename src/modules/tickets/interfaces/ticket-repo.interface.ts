@@ -1,4 +1,10 @@
-import { ITicket, ITicketCreate, ITicketLifecycle } from "./ticket.interface";
+import { Role } from "@/modules/users/enums/role.enum";
+import {
+	ITicket,
+	ITicketCreate,
+	ITicketLifecycle,
+	TicketStatus,
+} from "./ticket.interface";
 
 export interface ITicketRepository {
 	createTicket(ticket: ITicketCreate): Promise<ITicket>;
@@ -14,7 +20,13 @@ export interface ITicketRepository {
 	updateTicket(
 		existingTicket: ITicket,
 		updateBody: Partial<ITicket>,
-		performedBy: any, // IUser, but import path may vary
+		action: TicketStatus,
+		performerRole: Role,
+		performedBy: {
+			agentId?: string;
+			responderId?: string;
+			userId?: string;
+		},
 		context?: {
 			notes?: string;
 			assignedResponderId?: string;

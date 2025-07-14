@@ -11,10 +11,12 @@ import NewUser from "@/shared/email/templates/NewUser";
 import NewTicket from "@/shared/email/templates/NewTicket";
 import { EmailComponent, EmailPayload } from "@/shared/email/types";
 import { Logger } from "@/shared/logger/service";
+import TicketEscalated from "@/shared/email/templates/TicketEscalated";
 
 export const templates = {
 	NewUser,
 	NewTicket,
+	TicketEscalated,
 };
 
 @Injectable()

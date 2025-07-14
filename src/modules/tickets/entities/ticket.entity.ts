@@ -17,6 +17,7 @@ import { User } from "@/modules/users/entities/user.entity";
 import { Agent } from "@/modules/agents/entities/agent.entity";
 import { Responder } from "@/modules/responders/entities/responder.entity";
 import { Role } from "@/modules/users/enums/role.enum";
+import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
 @Entity()
 export class Tickets {
@@ -26,9 +27,6 @@ export class Tickets {
 	@Column("varchar")
 	title: string;
 
-	@Column("varchar")
-	type: string;
-
 	@Column("text")
 	description: string;
 
@@ -37,6 +35,9 @@ export class Tickets {
 
 	@Column("varchar", { nullable: true })
 	severity: TicketSeverity;
+
+	@Column("varchar", { nullable: true })
+	tier: ResponderType;
 
 	@Column("varchar")
 	location: string;
@@ -82,5 +83,8 @@ export class Tickets {
 		default: () => "NOW()",
 	})
 	updatedAt: Date;
-	// TODO: Add responder columnn
+
+	@ManyToOne(() => Responder, { nullable: true })
+	@JoinColumn({ name: "assigned_responder_id" })
+	assignedResponder: Responder;
 }

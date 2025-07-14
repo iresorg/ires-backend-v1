@@ -2,6 +2,7 @@ import { IUser } from "@/modules/users/interfaces/user.interface";
 import { IAgent } from "@/modules/agents/interfaces/agent.interface";
 import { IResponder } from "@/modules/responders/interfaces/responder.interface";
 import { Role } from "@/modules/users/enums/role.enum";
+import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
 export interface VictimInformation {
 	name: string;
@@ -32,7 +33,7 @@ export interface ContactInformation {
 export interface ITicket {
 	ticketId: string;
 	title: string;
-	type: string;
+	tier: ResponderType;
 	description: string;
 	status: TicketStatus;
 	severity?: TicketSeverity;
@@ -46,25 +47,35 @@ export interface ITicket {
 	updatedAt: Date;
 	createdBy: {
 		id: string;
-		name?: string;
+		firstName?: string;
+		lastName?: string;
 		role: Role;
+	};
+	assignedResponder?: {
+		id: string;
+		type: ResponderType;
 	};
 }
 
-export enum TicketLifecycleAction {
-	CREATE = "create",
-	UPDATE = "update",
-	DELETE = "delete",
+export interface ITicketLifecycle {
+	id: string;
+	ticketId: string;
+	action: TicketStatus;
+	performedBy: {
+		id: string;
+		firstName?: string;
+		lastName?: string;
+		role: Role;
+	};
+	notes: string;
+	createdAt: Date;
 }
 
-export interface ITicketLifecycle {
-	ticketId: string;
-	action: TicketLifecycleAction;
+export interface ITicketLifecycleCreate
+	extends Omit<ITicketLifecycle, "performedBy"> {
 	performedByUser?: IUser;
 	perfromedByAgent?: IAgent;
 	performedByResponder?: IResponder;
-	notes: string;
-	createdAt: Date;
 }
 
 export enum TicketSeverity {
@@ -75,7 +86,7 @@ export enum TicketSeverity {
 
 export type ITicketCreate = Omit<
 	ITicket,
-	"status" | "createdAt" | "updatedAt" | "severity" | "createdBy"
+	"status" | "createdAt" | "updatedAt" | "severity" | "createdBy" | "tier"
 > & {
 	actorId: string;
 	actorType: "agent" | "responder" | "admin";

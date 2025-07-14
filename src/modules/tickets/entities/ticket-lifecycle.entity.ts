@@ -3,8 +3,9 @@ import { Column, Entity, ManyToOne, JoinColumn } from "typeorm";
 import { Tickets } from "./ticket.entity";
 import { User } from "@/modules/users/entities/user.entity";
 import { Responder } from "@/modules/responders/entities/responder.entity";
-import { TicketLifecycleAction } from "../interfaces/ticket.interface";
+import { TicketStatus } from "../interfaces/ticket.interface";
 import { Agent } from "@/modules/agents/entities/agent.entity";
+import { Role } from "@/modules/users/enums/role.enum";
 
 @Entity()
 export class TicketLifecycle extends BaseEntity {
@@ -13,7 +14,10 @@ export class TicketLifecycle extends BaseEntity {
 	ticket: Tickets;
 
 	@Column("varchar")
-	action: TicketLifecycleAction;
+	action: TicketStatus;
+
+	@Column("varchar")
+	performerRole: Role;
 
 	@ManyToOne(() => User, { nullable: true })
 	@JoinColumn({ name: "performed_by_user_id" })
