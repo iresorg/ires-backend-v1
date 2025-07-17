@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRES WebSocket Test Client</title>
+    <script src="https://cdn.socket.io/4.7.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .online { background-color: #d4edda; color: #155724; }
+        .offline { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+
+        .message-log {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .input-group {
+            margin: 10px 0;
+        }
+
+        input, select, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .chat-message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .chat-message.sent {
+            background-color: #d1ecf1;
+            text-align: right;
+        }
+
+        .chat-message.received {
+            background-color: #e2e3e5;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔌 IRES WebSocket Test Client</h1>
+
+    <div class="container">
+        <!-- Connection Panel -->
+        <div class="panel">
+            <h2>🔗 Connection</h2>
+            <div class="input-group">
+                <label>Server URL:</label>
+                <input type="text" id="serverUrl" value="http://localhost:3000" style="width: 200px;">
+            </div>
+            <div class="input-group">
+                <label>Namespace:</label>
+                <select id="namespace">
+                    <option value="/agents">Agents</option>
+                    <option value="/responders">Responders</option>
+                    <option value="/chat">Chat</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>JWT Token:</label>
+                <input type="text" id="jwtToken" placeholder="Enter your JWT token" style="width: 300px;">
+            </div>
+            <div class="input-group">
+                <button id="connectBtn" onclick="connect()">Connect</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            </div>
+            <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="panel">
+            <h2>📊 Status</h2>
+            <div class="input-group">
+                <button onclick="updateStatus(true)">Go Online</button>
+                <button onclick="updateStatus(false)">Go Offline</button>
+            </div>
+            <div class="input-group">
+                <button onclick="updateAvailability(true)">Set Available</button>
+                <button onclick="updateAvailability(false)">Set Unavailable</button>
+            </div>
+            <div id="currentStatus">Not connected</div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="panel">
+            <h2>💬 Chat</h2>
+            <div class="input-group">
+                <input type="text" id="roomId" placeholder="Room ID" style="width: 150px;">
+                <button onclick="joinRoom()">Join Room</button>
+                <button onclick="leaveRoom()">Leave Room</button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="Type your message..." style="width: 250px;">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+            <div id="chatMessages" class="message-log"></div>
+        </div>
+
+        <!-- Event Log Panel -->
+        <div class="panel">
+            <h2>📝 Event Log</h2>
+            <button onclick="clearLog()">Clear Log</button>
+            <div id="eventLog" class="message-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentRoom = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('eventLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #666;">[${timestamp}]</span> <span style="color: ${type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue'};">${message}</span>`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.className = `status ${status}`;
+            statusDiv.textContent = message;
+        }
+
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const namespace = document.getElementById('namespace').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+
+            if (!jwtToken) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            updateConnectionStatus('connecting', 'Connecting...');
+            log(`Connecting to ${serverUrl}${namespace}...`);
+
+            socket = io(`${serverUrl}${namespace}`, {
+                auth: { token: jwtToken },
+                transports: ['websocket', 'polling']
+            });
+
+            // Connection events
+            socket.on('connect', () => {
+                updateConnectionStatus('online', 'Connected');
+                log('✅ Connected to WebSocket server', 'success');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+            });
+
+            socket.on('disconnect', () => {
+                updateConnectionStatus('disconnected', 'Disconnected');
+                log('❌ Disconnected from WebSocket server', 'error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            });
+
+            socket.on('connect_error', (error) => {
+                updateConnectionStatus('disconnected', 'Connection Failed');
+                log(`❌ Connection error: ${error.message}`, 'error');
+            });
+
+            // Status events
+            socket.on('status:online', (data) => {
+                log(`🟢 User went online: ${JSON.stringify(data)}`, 'success');
+                document.getElementById('currentStatus').innerHTML = `<div class="status online">Online - ${data.userId}</div>`;
+            });
+
+            socket.on('status:offline', (data) => {
+                log(`🔴 User went offline: ${JSON.stringify(data)}`, 'error');
+                document.getElementById('currentStatus').innerHTML = `<div class="status offline">Offline - ${data.userId}</div>`;
+            });
+
+            socket.on('agent:availability:updated', (data) => {
+                log(`📊 Agent availability updated: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('responder:availability:updated', (data) => {
+                log(`📊 Responder availability updated: ${JSON.stringify(data)}`, 'success');
+            });
+
+            // Chat events
+            socket.on('chat:message', (message) => {
+                addChatMessage(message, 'received');
+                log(`💬 Received message: ${message.content}`, 'success');
+            });
+
+            socket.on('chat:room:joined', (data) => {
+                log(`🚪 Joined room: ${JSON.stringify(data)}`, 'success');
+            });
+
+            socket.on('chat:room:left', (data) => {
+                log(`🚪 Left room: ${JSON.stringify(data)}`, 'success');
+            });
+
+            // Error events
+            socket.on('system:error', (error) => {
+                log(`❌ System error: ${error.message}`, 'error');
+            });
+
+            // Authentication events
+            socket.on('system:notification', (notification) => {
+                log(`📢 System notification: ${JSON.stringify(notification)}`, 'success');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function updateStatus(isOnline) {
+            if (!socket) {
+                log('❌ Not connected', 'error');
+                return;
+            }
+
+            const event = document.getElementById('namespace').value === '/agents' ? 'agent:status:update' : 'responder:status:update';
+            socket.emit(event, { isOnline });
+            log(`🔄 Sending status update: ${isOnline ? 'online' : 'offline'}`);
+        }
+
+        function updateAvailability(isAvailable) {
+            if (!socket) {
+                log('❌ Not connected', 'error');
+                return;
+            }
+
+            const event = document.getElementById('namespace').value === '/agents' ? 'agent:availability:update' : 'responder:availability:update';
+            socket.emit(event, { isAvailable });
+            log(`🔄 Sending availability update: ${isAvailable ? 'available' : 'unavailable'}`);
+        }
+
+        function joinRoom() {
+            if (!socket) {
+                log('❌ Not connected', 'error');
+                return;
+            }
+
+            const roomId = document.getElementById('roomId').value;
+            if (!roomId) {
+                alert('Please enter a room ID');
+                return;
+            }
+
+            socket.emit('chat:room:join', roomId);
+            currentRoom = roomId;
+            log(`🔄 Joining room: ${roomId}`);
+        }
+
+        function leaveRoom() {
+            if (!socket || !currentRoom) {
+                log('❌ Not connected or no room joined', 'error');
+                return;
+            }
+
+            socket.emit('chat:room:leave', currentRoom);
+            log(`🔄 Leaving room: ${currentRoom}`);
+            currentRoom = null;
+        }
+
+        function sendMessage() {
+            if (!socket) {
+                log('❌ Not connected', 'error');
+                return;
+            }
+
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+
+            if (!content) {
+                alert('Please enter a message');
+                return;
+            }
+
+            const messageData = { content };
+            if (currentRoom) {
+                messageData.roomId = currentRoom;
+            }
+
+            socket.emit('chat:message', messageData);
+            addChatMessage({ content, sender: { userName: 'You' } }, 'sent');
+            messageInput.value = '';
+            log(`🔄 Sending message: ${content}`);
+        }
+
+        function addChatMessage(message, type) {
+            const chatDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${type}`;
+            messageDiv.textContent = `${message.sender?.userName || 'Unknown'}: ${message.content}`;
+            chatDiv.appendChild(messageDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('eventLog').innerHTML = '';
+        }
+
+        // Enter key for message input
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        log('🚀 WebSocket Test Client loaded');
+        log('📝 Instructions:');
+        log('1. Get a JWT token from your login endpoint');
+        log('2. Enter the token and click Connect');
+        log('3. Test status updates and chat functionality');
+    </script>
+</body>
+</html>

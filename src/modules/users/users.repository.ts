@@ -4,7 +4,7 @@ import { Role } from "./enums/role.enum";
 import { IUser, IUserCreate } from "./interfaces/user.interface";
 import { User } from "./entities/user.entity";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, In } from "typeorm";
 import { UserAlreadyExistsError, UserNotFoundError } from "@/shared/errors";
 
 @Injectable()
@@ -39,6 +39,46 @@ export class UserRepository implements IUserRepository {
 		});
 
 		return users.map((user) => this.mapToIUser(user));
+	}
+
+	async findAllPaginated(skip: number, limit: number): Promise<[IUser[], number]> {
+		const [users, total] = await this.userRepo.findAndCount({
+			order: { createdAt: "DESC" },
+			skip,
+			take: limit,
+		});
+
+		return [users.map((user) => this.mapToIUser(user)), total];
+	}
+
+	async findByRolePaginated(
+		role: Role,
+		skip: number,
+		limit: number,
+	): Promise<[IUser[], number]> {
+		const [users, total] = await this.userRepo.findAndCount({
+			where: { role },
+			order: { createdAt: "DESC" },
+			skip,
+			take: limit,
+		});
+
+		return [users.map((user) => this.mapToIUser(user)), total];
+	}
+
+	async findByRolesPaginated(
+		roles: Role[],
+		skip: number,
+		limit: number,
+	): Promise<[IUser[], number]> {
+		const [users, total] = await this.userRepo.findAndCount({
+			where: { role: In(roles) },
+			order: { createdAt: "DESC" },
+			skip,
+			take: limit,
+		});
+
+		return [users.map((user) => this.mapToIUser(user)), total];
 	}
 
 	async create(body: IUserCreate): Promise<IUser> {

@@ -30,13 +30,3 @@ export class BaseStatusMessageDto {
 	@IsDateString()
 	lastStatusChangeAt?: string;
 }
-
-export class AgentStatusMessageDto extends BaseStatusMessageDto {
-	@IsString()
-	agentId: string;
-}
-
-export class ResponderStatusMessageDto extends BaseStatusMessageDto {
-	@IsString()
-	responderId: string;
-}

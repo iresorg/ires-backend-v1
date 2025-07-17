@@ -6,6 +6,9 @@ export interface IUserRepository {
 	findById(id: string): Promise<IUser | null>;
 	findAll(): Promise<IUser[]>;
 	findUsersByRole(role: Role): Promise<IUser[]>;
+	findAllPaginated(skip: number, limit: number): Promise<[IUser[], number]>;
+	findByRolePaginated(role: Role, skip: number, limit: number): Promise<[IUser[], number]>;
+	findByRolesPaginated(roles: Role[], skip: number, limit: number): Promise<[IUser[], number]>;
 	/**
 	 * @throws {UserAlreadyExistsError}
 	 */
