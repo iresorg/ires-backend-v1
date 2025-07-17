@@ -35,3 +35,12 @@ export class InappropriateTierError extends HttpException {
 		this.name = "InappropriateTierError";
 	}
 }
+
+export class TicketCategoryNotFoundError extends HttpException {
+	constructor(message = "Ticket category not found") {
+		super(message, HttpStatus.NOT_FOUND, {
+			description: message,
+		});
+		this.name = "TicketCategoryNotFoundError";
+	}
+}
