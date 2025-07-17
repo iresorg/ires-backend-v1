@@ -43,6 +43,7 @@ class TokenEncryptionInitializer implements OnModuleInit {
 	}
 }
 import { TicketsModule } from "./modules/tickets/module";
+import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
 
 @Module({
 	imports: [
@@ -62,6 +63,7 @@ import { TicketsModule } from "./modules/tickets/module";
 		EmailModule,
 		QueueModule,
 		TicketsModule,
+		TicketCategoriesModule,
 	],
 	providers: [TokenEncryptionInitializer],
 })
