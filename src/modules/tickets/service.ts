@@ -1,52 +1,65 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import {
 	ITicket,
 	ITicketCreate,
 	ITicketLifecycle,
+	TicketSeverity,
 	TicketStatus,
+	TicketTiers,
 } from "./interfaces/ticket.interface";
-import { ITicketRepository } from "./interfaces/ticket-repo.interface";
-import constants from "./constant";
-import { Inject } from "@nestjs/common";
 import { UsersService } from "@/modules/users/users.service";
-import {
-	TicketNotFoundError,
-	TicketEscalationReasonRequiredError,
-	InappropriateTierError,
-} from "@/shared/errors/ticket.errors";
+import { TicketNotFoundError } from "@/shared/errors/ticket.errors";
 import { AgentsService } from "@/modules/agents/agents.service";
 import { RespondersService } from "@/modules/responders/responders.service";
-import { AgentNotFoundError, UserNotFoundError } from "@/shared/errors";
-import { ResponderNotFoundError } from "@/shared/errors/responder.errors";
 import { EmailService } from "@/shared/email/service";
 import { Role } from "../users/enums/role.enum";
+import { TicketsRepository } from "./repository";
+import {
+	TDatabaseService,
+	TDatabaseTransaction,
+} from "@/shared/database/datasource";
+import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
+import { AssignResponder, ReassignTicket } from "./types";
 
 @Injectable()
 export class TicketsService {
 	constructor(
-		@Inject(constants.TICKET_REPOSITORY)
-		private readonly ticketsRepository: ITicketRepository,
+		private readonly ticketsRepository: TicketsRepository,
+		private readonly ticketLifecyleRepo: TicketLifecycleRepository,
 		private readonly usersService: UsersService,
 		private readonly agentsService: AgentsService,
 		private readonly respondersService: RespondersService,
 		private readonly emailService: EmailService,
+		private readonly databaseService: TDatabaseService,
 	) {}
 
 	async createTicket(
 		body: Omit<ITicketCreate, "ticketId">,
 	): Promise<ITicket> {
-		await this.validateActor(body.actorType, body.actorId);
 		const ticketId = this.generateTicketId();
-		const ticket = await this.ticketsRepository.createTicket({
-			...body,
-			ticketId,
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.ticketsRepository.createTicket(
+				{ ...body, ticketId },
+				trx,
+			);
+
+			await this.ticketLifecyleRepo.create(
+				{
+					action: TicketStatus.CREATED,
+					performedById: body.createdById,
+					ticketId,
+					notes: body.internalNotes,
+				},
+				trx,
+			);
 		});
-		const savedTicket = await this.ticketsRepository.getTicketById(
-			ticket.ticketId,
-		);
-		const responderAdmins = await this.usersService.findAll({
-			role: Role.RESPONDER_ADMIN,
-		});
+
+		const [savedTicket, responderAdmins] = await Promise.all([
+			this.ticketsRepository.getTicketById(ticketId),
+			this.usersService.findAll({
+				role: Role.RESPONDER_ADMIN,
+			}),
+		]);
 
 		if (responderAdmins.length) {
 			await this.emailService.sendNewTicketEmail(
@@ -66,29 +79,6 @@ export class TicketsService {
 		return savedTicket;
 	}
 
-	async validateActor(
-		actorType: "admin" | "agent" | "responder",
-		actorId: string,
-	) {
-		if (actorType === "admin") {
-			const user = await this.usersService.findOne({
-				id: actorId,
-			});
-			if (!user) throw new UserNotFoundError();
-		} else if (actorType === "agent") {
-			const agent = await this.agentsService.findOne(actorId);
-
-			if (!agent)
-				throw new AgentNotFoundError(
-					"This agent account does not exist. Please contact support.",
-				);
-		} else if (actorType === "responder") {
-			const responder = await this.respondersService.findOne(actorId);
-
-			if (!responder) throw new ResponderNotFoundError();
-		}
-	}
-
 	async getTicketById(ticketId: string): Promise<ITicket | null> {
 		const ticket = await this.ticketsRepository.getTicketById(ticketId);
 		if (!ticket) throw new TicketNotFoundError();
@@ -100,101 +90,188 @@ export class TicketsService {
 		return this.ticketsRepository.getTickets();
 	}
 
-	/**
-	 * Updates a ticket and creates a lifecycle event if status changes.
-	 * @param ticketId The ticket ID
-	 * @param updateBody The updated ticket data (partial)
-	 * @param performedBy The user ID performing the update
-	 * @param context Optional context: { notes, assignedResponderId, escalationReason, escalatedToUserId }
-	 */
-	async updateTicket(
-		action: TicketStatus,
+	async assignTicket(
 		ticketId: string,
-		updateBody: Partial<ITicket>,
-		performedBy: string,
-		performerRole: Role,
-		context?: {
-			notes?: string;
-			assignedResponderId?: string;
-			escalationReason?: string;
-			escalatedToUserId?: string;
-		},
-	): Promise<ITicket> {
-		// Check for ticket existence before updating
-		const existing = await this.ticketsRepository.getTicketById(ticketId);
-		if (!existing) {
-			throw new TicketNotFoundError();
-		}
+		performedById: string,
+		body: AssignResponder,
+	) {
+		const [ticket, responder] = await Promise.all([
+			this.getTicketById(ticketId),
+			this.usersService.findOne({ id: body.assignedResponderId }),
+		]);
 
-		// Check for escalation reason if status is ESCALATED
-		if (
-			updateBody.status === TicketStatus.ESCALATED &&
-			!context?.escalationReason
-		) {
-			throw new TicketEscalationReasonRequiredError();
-		}
-
-		if (context.assignedResponderId) {
-			const responder = await this.respondersService.findOne(
-				context.assignedResponderId,
+		if (ticket.status !== TicketStatus.ANALYSING) {
+			throw new BadRequestException(
+				"Ticket should be analyzed before assignment",
 			);
-
-			if (!responder) throw new ResponderNotFoundError();
-
-			if (responder.type !== updateBody.tier) {
-				throw new InappropriateTierError(
-					"Tier selected does not tally with responder selected.",
-				);
-			}
 		}
 
-		if (action === TicketStatus.RESPONDING) {
-			if (existing.assignedResponder.id !== performedBy) {
-				const e = new UnauthorizedException(
-					"Only assigned responder can respond to this ticket",
-				);
-				e.name = "UnauthorisedResponderError";
+		await this.databaseService.withTransaction(async (trx) => {
+			const lifeCycleNotes =
+				`Assigned responder: ${responder.firstName + " " + responder.lastName}` +
+				(body.notes ? ` | ${body.notes}` : "");
 
-				throw e;
-			}
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.ASSIGNED,
+				performedById,
+				lifeCycleNotes,
+				trx,
+			);
+		});
+	}
+
+	async startAnalysingTicket(
+		ticketId: string,
+		performedById: string,
+		notes?: string,
+	) {
+		await this.getTicketById(ticketId);
+
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.ANALYSING,
+				performedById,
+				notes,
+				trx,
+			);
+		});
+	}
+
+	async startRespondingToTicket(
+		ticketId: string,
+		performedById: string,
+		notes?: string,
+	) {
+		await this.getTicketById(ticketId);
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.IN_PROGRESS,
+				performedById,
+				notes,
+				trx,
+			);
+		});
+	}
+
+	async escalateTicket(
+		ticketId: string,
+		performedById: string,
+		escalationReason: string,
+	) {
+		const [ticket, performer, responderAdmins] = await Promise.all([
+			this.getTicketById(ticketId),
+			this.usersService.findOne({ id: performedById }),
+			this.usersService.findAll({ role: Role.RESPONDER_ADMIN }),
+		]);
+
+		if (ticket.status !== TicketStatus.IN_PROGRESS) {
+			throw new BadRequestException(
+				"Ticket has to be in progress before it can be escalated.",
+			);
 		}
 
-		const updatedTicket = await this.ticketsRepository.updateTicket(
-			existing,
-			updateBody,
-			action,
-			performerRole,
-			performerRole === Role.RESPONDER
-				? { responderId: performedBy }
-				: performerRole === Role.AGENT
-					? { agentId: performedBy }
-					: { userId: performedBy },
-			context,
-		);
-		if (!updatedTicket) {
-			throw new TicketNotFoundError();
-		}
-		if (updateBody.status === TicketStatus.ESCALATED) {
-			// Send a mail to responder admin
-			const responderAdmin = await this.usersService.findAll({
-				role: Role.RESPONDER_ADMIN,
-			});
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.ESCALATED,
+				performedById,
+				escalationReason,
+				trx,
+			);
+		});
+
+		if (responderAdmins.length) {
 			await this.emailService.sendTicketEscalatedEmail(
-				responderAdmin.map((admin) => admin.email),
+				responderAdmins.map((admin) => admin.email),
 				{
-					escalatedBy: performedBy,
-					escalationReason: context.escalationReason,
-					subject: updatedTicket.title,
-					ticketId: updatedTicket.ticketId,
-					timestamp: updatedTicket.createdAt.toLocaleString(),
+					escalatedBy: `${performer.lastName} ${performer.firstName}`,
+					escalationReason,
+					subject: ticket.title,
+					ticketId,
+					timestamp: new Date().toLocaleString(),
 				},
 			);
 		}
-		return updatedTicket;
+	}
+
+	async reassignTicket(
+		ticketId: string,
+		performerById: string,
+		body: ReassignTicket,
+	) {
+		await this.getTicketById(ticketId);
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.REASSIGNED,
+				performerById,
+				body.notes,
+				trx,
+				body.assignedResponderId,
+				body.severity,
+				body.tier,
+			);
+		});
+	}
+
+	async resolveTicket(
+		ticketId: string,
+		performerById: string,
+		notes?: string,
+	) {
+		await this.getTicketById(ticketId);
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.RESOLVED,
+				performerById,
+				notes,
+				trx,
+			);
+		});
+	}
+
+	async closeTicket(ticketId: string, performerById: string, notes?: string) {
+		await this.getTicketById(ticketId);
+		await this.databaseService.withTransaction(async (trx) => {
+			await this.updateStatusAndLifecycle(
+				ticketId,
+				TicketStatus.CLOSED,
+				performerById,
+				notes,
+				trx,
+			);
+		});
+	}
+
+	private async updateStatusAndLifecycle(
+		ticketId: string,
+		status: TicketStatus,
+		performedById: string,
+		notes?: string,
+		trx?: TDatabaseTransaction,
+		assignedResponderId?: string,
+		severity?: TicketSeverity,
+		tier?: TicketTiers,
+	) {
+		await Promise.all([
+			this.ticketsRepository.updateTicket(
+				ticketId,
+				{ status, assignedResponderId, severity, tier },
+				trx,
+			),
+			this.ticketLifecyleRepo.create(
+				{ ticketId, action: status, performedById, notes },
+				trx,
+			),
+		]);
 	}
 
 	async getTicketLifecycle(ticketId: string): Promise<ITicketLifecycle[]> {
-		return this.ticketsRepository.getTicketLifecycle(ticketId);
+		return this.ticketLifecyleRepo.getByTicketId(ticketId);
 	}
 
 	generateTicketId(): string {

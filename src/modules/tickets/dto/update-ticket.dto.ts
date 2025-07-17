@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { TicketSeverity } from "../interfaces/ticket.interface";
+import { TicketSeverity, TicketTiers } from "../interfaces/ticket.interface";
 import { Transform } from "class-transformer";
 import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
@@ -11,22 +11,6 @@ export class EscalateTicketDto {
 	})
 	@IsString()
 	escalationReason: string;
-
-	@ApiProperty({
-		description: "User ID to whom ticket is escalated",
-		required: false,
-	})
-	@IsOptional()
-	@IsString()
-	escalatedToUserId?: string;
-
-	@ApiProperty({
-		description: "Internal notes for escalation",
-		required: false,
-	})
-	@IsOptional()
-	@IsString()
-	notes?: string;
 }
 
 export class AssignTicketDto {
@@ -42,8 +26,8 @@ export class AssignTicketDto {
 			"What tier the ticket belongs to. Reasonably the tier of the repsonder.",
 		required: true,
 	})
-	@IsEnum(ResponderType)
-	tier: ResponderType;
+	@IsEnum(TicketTiers)
+	tier: TicketTiers;
 
 	@ApiProperty({
 		description: "Severity or ungency level of the ticket.",

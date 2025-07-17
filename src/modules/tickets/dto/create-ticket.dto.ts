@@ -4,6 +4,7 @@ import {
 	IsOptional,
 	IsArray,
 	ValidateNested,
+	IsUUID,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
@@ -62,11 +63,7 @@ class ContactInformationDto implements ContactInformation {
 }
 
 export class CreateTicketDto
-	implements
-		Omit<
-			ITicketCreate,
-			"ticketId" | "performedBy" | "actorType" | "actorId" | "creatorRole"
-		>
+	implements Omit<ITicketCreate, "ticketId" | "createdById">
 {
 	@ApiProperty({ description: "Ticket title" })
 	@IsNotEmpty()
@@ -126,4 +123,12 @@ export class CreateTicketDto
 	@IsArray()
 	@IsString({ each: true })
 	attachments?: string[];
+
+	@IsString()
+	@IsUUID()
+	categoryId: string;
+
+	@IsOptional()
+	@IsString()
+	subCategoryId?: string;
 }

@@ -12,12 +12,11 @@ import {
 	TicketStatus,
 	ContactInformation,
 	VictimInformation,
+	TicketTiers,
 } from "../interfaces/ticket.interface";
 import { User } from "@/modules/users/entities/user.entity";
-import { Agent } from "@/modules/agents/entities/agent.entity";
-import { Responder } from "@/modules/responders/entities/responder.entity";
-import { Role } from "@/modules/users/enums/role.enum";
-import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
+import { TicketCategory } from "@/modules/ticket-categories/entities/ticket-category.entity";
+import { TicketSubCategory } from "@/modules/ticket-categories/entities/ticket-sub-category.entity";
 
 @Entity()
 export class Tickets {
@@ -37,7 +36,7 @@ export class Tickets {
 	severity: TicketSeverity;
 
 	@Column("varchar", { nullable: true })
-	tier: ResponderType;
+	tier: TicketTiers;
 
 	@Column("varchar")
 	location: string;
@@ -57,20 +56,12 @@ export class Tickets {
 	@Column("text", { nullable: true, name: "internal_notes" })
 	internalNotes: string;
 
-	@Column("varchar")
-	creatorRole: Role;
-
-	@ManyToOne(() => User, { nullable: true })
-	@JoinColumn({ name: "created_by_user_id" })
-	createdByUser: User;
-
-	@ManyToOne(() => Agent, { nullable: true })
-	@JoinColumn({ name: "created_by_agent_id" })
-	createdByAgent: Agent;
-
-	@ManyToOne(() => Responder, { nullable: true })
-	@JoinColumn({ name: "created_by_responder_id" })
-	createdByResponder: Responder;
+	@ManyToOne(() => User)
+	@JoinColumn({
+		name: "created_by_user_id",
+		foreignKeyConstraintName: "FK_ticket_created_by_user_id",
+	})
+	createdBy: User;
 
 	@CreateDateColumn({
 		name: "created_at",
@@ -84,7 +75,29 @@ export class Tickets {
 	})
 	updatedAt: Date;
 
-	@ManyToOne(() => Responder, { nullable: true })
-	@JoinColumn({ name: "assigned_responder_id" })
-	assignedResponder: Responder;
+	@ManyToOne(() => User, { nullable: true })
+	@JoinColumn({
+		name: "assigned_responder_id",
+		foreignKeyConstraintName: "FK_ticket_assigned_responder_id",
+	})
+	assignedResponder: User;
+
+	@ManyToOne(() => TicketCategory, (tc) => tc.tickets, {
+		onDelete: "SET NULL",
+	})
+	@JoinColumn({
+		name: "ticket_category_id",
+		foreignKeyConstraintName: "FK_ticket_category_id",
+	})
+	category: TicketCategory;
+
+	@ManyToOne(() => TicketSubCategory, (tsc) => tsc.tickets, {
+		onDelete: "SET NULL",
+		nullable: true,
+	})
+	@JoinColumn({
+		name: "ticket _sub_category_id",
+		foreignKeyConstraintName: "FK_ticket_subcategory_id",
+	})
+	subCategory: TicketSubCategory;
 }

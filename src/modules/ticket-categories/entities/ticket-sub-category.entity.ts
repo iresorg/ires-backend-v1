@@ -1,6 +1,7 @@
 import { BaseEntity } from "@/shared/entity/base.entity";
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 import { TicketCategory } from "./ticket-category.entity";
+import { Tickets } from "@/modules/tickets/entities/ticket.entity";
 
 @Entity()
 export class TicketSubCategory extends BaseEntity {
@@ -15,4 +16,7 @@ export class TicketSubCategory extends BaseEntity {
 		foreignKeyConstraintName: "fk_ticket_category_id",
 	})
 	category: TicketCategory;
+
+	@OneToMany(() => Tickets, (t) => t.subCategory)
+	tickets: Tickets[];
 }

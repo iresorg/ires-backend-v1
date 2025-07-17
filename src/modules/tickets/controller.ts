@@ -37,17 +37,14 @@ export class TicketsController {
 
 	@ApiOperation({ summary: "Create a new ticket" })
 	@ApiResponse({ status: 201, description: "Ticket created successfully" })
-	@Post("/:actorType(responder|agent|admin)")
+	@Post()
 	async createTicket(
 		@Body() createTicketDto: CreateTicketDto,
 		@Req() req: AuthRequest,
-		@Param("actorType") actorType: "responder" | "agent" | "admin",
 	): Promise<{ message: string; data: ITicket }> {
 		const data = await this.ticketsService.createTicket({
 			...createTicketDto,
-			actorId: req.user.id,
-			actorType,
-			creatorRole: req.user.role,
+			createdById: req.user.id,
 		});
 		return {
 			message: "Ticket created successfully",
@@ -64,6 +61,17 @@ export class TicketsController {
 		const data = await this.ticketsService.getTicketById(ticketId);
 		return {
 			message: "Ticket fetched successfully",
+			data,
+		};
+	}
+
+	@ApiOperation({ summary: "Get all tickets" })
+	@ApiResponse({ status: 200, description: "Tickets fetched successfully" })
+	@Get()
+	async getTickets(): Promise<{ message: string; data: ITicket[] }> {
+		const data = await this.ticketsService.getTickets();
+		return {
+			message: "Tickets fetched successfully",
 			data,
 		};
 	}
@@ -93,20 +101,13 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: EscalateTicketDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.ESCALATED,
+	) {
+		await this.ticketsService.escalateTicket(
 			ticketId,
-			{ status: TicketStatus.ESCALATED },
 			req.user.id,
-			req.user.role,
-			{
-				escalationReason: body.escalationReason,
-				escalatedToUserId: body.escalatedToUserId,
-				notes: body.notes,
-			},
+			body.escalationReason,
 		);
-		return { message: "Ticket escalated", data: updated };
+		return { message: "Ticket escalated successfully" };
 	}
 
 	@ApiOperation({ summary: "Assign a responder to a ticket" })
@@ -118,23 +119,25 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: AssignTicketDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.ASSIGNED,
-			ticketId,
-			{
-				status: TicketStatus.ASSIGNED,
-				tier: body.tier,
-				severity: body.severity,
-			},
-			req.user.id,
-			req.user.role,
-			{
-				assignedResponderId: body.assignedResponderId,
-				notes: body.notes,
-			},
-		);
-		return { message: "Ticket assigned", data: updated };
+	) {
+		await this.ticketsService.assignTicket(ticketId, req.user.id, body);
+		return { message: "Ticket assigned successfulyy" };
+	}
+
+	@ApiOperation({
+		summary: "Reassign a responder to a ticket after escalation",
+	})
+	@ApiResponse({ status: 200, description: "Ticket assigned" })
+	@ApiBody({ type: AssignTicketDto })
+	@Roles(Role.RESPONDER_ADMIN, Role.SUPER_ADMIN)
+	@Patch(":ticketId/reAssign")
+	async reAssignTicket(
+		@Param("ticketId") ticketId: string,
+		@Body() body: AssignTicketDto,
+		@Req() req: AuthRequest,
+	) {
+		await this.ticketsService.reassignTicket(ticketId, req.user.id, body);
+		return { message: "Ticket reassigned successfully" };
 	}
 
 	@ApiOperation({ summary: "Start analysing a ticket" })
@@ -147,16 +150,13 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: StartAnalysisDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.ANALYSING,
+	) {
+		await this.ticketsService.startAnalysingTicket(
 			ticketId,
-			{ status: TicketStatus.ANALYSING },
 			req.user.id,
-			req.user.role,
-			{ notes: body.notes },
+			body.notes,
 		);
-		return { message: "Ticket moved to analysing", data: updated };
+		return { message: "Ticket moved to analysing" };
 	}
 
 	@ApiOperation({ summary: "Start responding to a ticket" })
@@ -167,16 +167,13 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: StartRespondingDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.RESPONDING,
+	) {
+		await this.ticketsService.startRespondingToTicket(
 			ticketId,
-			{ status: TicketStatus.RESPONDING },
 			req.user.id,
-			req.user.role,
-			{ notes: body.notes },
+			body.notes,
 		);
-		return { message: "Ticket moved to responding", data: updated };
+		return { message: "Ticket moved to responding" };
 	}
 
 	@ApiOperation({ summary: "Resolve a ticket" })
@@ -187,16 +184,13 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: ResolveTicketDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.RESOLVED,
+	) {
+		await this.ticketsService.resolveTicket(
 			ticketId,
-			{ status: TicketStatus.RESOLVED },
 			req.user.id,
-			req.user.role,
-			{ notes: body.notes },
+			body.notes,
 		);
-		return { message: "Ticket resolved", data: updated };
+		return { message: "Ticket resolved" };
 	}
 
 	@ApiOperation({ summary: "Close a ticket" })
@@ -207,15 +201,12 @@ export class TicketsController {
 		@Param("ticketId") ticketId: string,
 		@Body() body: CloseTicketDto,
 		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: ITicket }> {
-		const updated = await this.ticketsService.updateTicket(
-			TicketStatus.CLOSED,
+	) {
+		await this.ticketsService.closeTicket(
 			ticketId,
-			{ status: TicketStatus.CLOSED },
 			req.user.id,
-			req.user.role,
-			{ notes: body.notes },
+			body.notes,
 		);
-		return { message: "Ticket closed", data: updated };
+		return { message: "Ticket closed" };
 	}
 }
