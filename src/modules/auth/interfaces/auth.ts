@@ -22,4 +22,7 @@ export interface ResponderAuthPayload {
 	type: ResponderType;
 }
 
-export type AuthPayload = UserAuthPayload | AgentAuthPayload | ResponderAuthPayload;
+export type AuthPayload =
+	| UserAuthPayload
+	| AgentAuthPayload
+	| ResponderAuthPayload;

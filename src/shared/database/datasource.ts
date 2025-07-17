@@ -1,15 +1,19 @@
 import "reflect-metadata";
-import { DataSource, DataSourceOptions } from "typeorm";
+import { DataSource, DataSourceOptions, QueryRunner } from "typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { User } from "../../modules/users/entities/user.entity";
 import { Agent } from "../../modules/agents/entities/agent.entity";
 import { AgentToken } from "../../modules/agents/entities/agent-token.entity";
 import { Responder } from "../../modules/responders/entities/responder.entity";
 import { ResponderToken } from "../../modules/responders/entities/responder-token.entity";
-import { Module } from "@nestjs/common";
+import { Injectable, Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Environment, EnvVariables, validateEnv } from "@/utils/env.validate";
 import "dotenv/config";
+import { Tickets } from "@/modules/tickets/entities/ticket.entity";
+import { TicketLifecycle } from "@/modules/tickets/entities/ticket-lifecycle.entity";
+import { TicketCategory } from "@/modules/ticket-categories/entities/ticket-category.entity";
+import { TicketSubCategory } from "@/modules/ticket-categories/entities/ticket-sub-category.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -23,7 +27,17 @@ export function createDataSourceOptions(
 		username: config.DB_USER,
 		password: config.DB_PASS,
 		database: config.DB_NAME,
-		entities: [User, Agent, AgentToken, Responder, ResponderToken],
+		entities: [
+			User,
+			Agent,
+			AgentToken,
+			Responder,
+			ResponderToken,
+			Tickets,
+			TicketLifecycle,
+			TicketCategory,
+			TicketSubCategory,
+		],
 		migrations: ["src/shared/database/migrations/*.ts"],
 		migrationsTableName: "migrations",
 		synchronize: config.NODE_ENV !== Environment.Production,
@@ -47,6 +61,53 @@ export function createDataSourceFactory(
 export const env = validateEnv(process.env);
 export const AppDataSource = new DataSource(createDataSourceOptions(env));
 
+export class TDatabaseTransaction {
+	constructor(private queryRunner: QueryRunner) {}
+
+	async commit() {
+		if (!this.queryRunner.isTransactionActive) {
+			throw new Error("Transaction not started before calling commit");
+		}
+		await this.queryRunner.commitTransaction();
+		await this.queryRunner.release();
+	}
+
+	async rollback() {
+		if (!this.queryRunner.isTransactionActive) {
+			throw new Error("Callig rollback outside a transaction");
+		}
+		await this.queryRunner.rollbackTransaction();
+		await this.queryRunner.release();
+	}
+
+	getContext() {
+		return this.queryRunner;
+	}
+}
+
+@Injectable()
+export class TDatabaseService {
+	constructor(private datasource: DataSource) {}
+
+	async withTransaction<T>(
+		callback: (trx: TDatabaseTransaction) => Promise<T>,
+	) {
+		const queryRunner = this.datasource.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
+		const trx = new TDatabaseTransaction(queryRunner);
+		try {
+			const result = await callback(trx);
+			await trx.commit();
+
+			return result;
+		} catch (error) {
+			await trx.rollback();
+			throw error;
+		}
+	}
+}
+
 @Module({
 	imports: [
 		TypeOrmModule.forRootAsync({
@@ -55,5 +116,7 @@ export const AppDataSource = new DataSource(createDataSourceOptions(env));
 			useFactory: createDataSourceFactory,
 		}),
 	],
+	providers: [TDatabaseService],
+	exports: [TDatabaseService],
 })
 export class DatabaseModule {}

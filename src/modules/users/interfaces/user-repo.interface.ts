@@ -4,7 +4,7 @@ import { IUser, IUserCreate } from "./user.interface";
 export interface IUserRepository {
 	findByEmail(email: string): Promise<IUser | null>;
 	findById(id: string): Promise<IUser | null>;
-	findAll(): Promise<IUser[]>;
+	findAll(filter: { role?: Role }): Promise<IUser[]>;
 	findUsersByRole(role: Role): Promise<IUser[]>;
 	/**
 	 * @throws {UserAlreadyExistsError}

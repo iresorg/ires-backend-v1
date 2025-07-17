@@ -5,7 +5,6 @@ import {
 	IsNotEmpty,
 	IsNumber,
 	IsString,
-	// IsUrl,
 	validateSync,
 } from "class-validator";
 
