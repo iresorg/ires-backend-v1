@@ -18,7 +18,7 @@ export default function (params: Params) {
       <Section className="pt-10 pb-12 bg-[#F7F8FD]">
         <Img
           className="h-12 mx-auto"
-          src="https://auxybonrcumfggtvxjpx.supabase.co/storage/v1/object/public/scrollz//Logo.svg"
+          src="https://auxybonrcumfggtvxjpx.supabase.co/storage/v1/object/public/scrollz//iRES%20MM%201.png"
         />
       </Section>
 

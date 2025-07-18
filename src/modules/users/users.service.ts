@@ -27,8 +27,8 @@ export class UsersService {
 		private readonly logger: Logger,
 	) {}
 
-	async findAll(): Promise<IUser[]> {
-		const users = await this.usersRepository.findAll();
+	async findAll(filter: { role?: Role } = {}): Promise<IUser[]> {
+		const users = await this.usersRepository.findAll(filter);
 		return users;
 	}
 

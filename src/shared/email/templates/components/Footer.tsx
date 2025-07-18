@@ -1,5 +1,5 @@
-import { Link, Text, Section, Row, Column, Hr } from "@react-email/components";
 import * as React from "react";
+import { Link, Text, Section, Row, Column, Hr } from "@react-email/components";
 
 export default () => (
   <Section className="pt-4 pb-10 px-2 text-center">

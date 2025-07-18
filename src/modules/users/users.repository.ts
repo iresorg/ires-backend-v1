@@ -25,8 +25,12 @@ export class UserRepository implements IUserRepository {
 		return user ? this.mapToIUser(user) : null;
 	}
 
-	async findAll(): Promise<IUser[]> {
+	async findAll(filter: { role?: Role } = {}): Promise<IUser[]> {
+		const { role } = filter;
 		const users = await this.userRepo.find({
+			where: {
+				...(role && { role }),
+			},
 			order: { createdAt: "DESC" },
 		});
 		return users.map((user) => this.mapToIUser(user));
