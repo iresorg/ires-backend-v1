@@ -7,8 +7,8 @@ import { scheduler } from "node:timers/promises";
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
-	private connection: amqp.Connection;
-	private channel: amqp.Channel;
+	private connection: any;
+	private channel: any;
 	private queueReady = false;
 
 	constructor(

@@ -12,14 +12,13 @@ import { validateEnv } from "./utils/env.validate";
 import { UtilsModule } from "./utils/utils.module";
 import { JwtProviderModule } from "./shared/jwt.module";
 import { DatabaseModule } from "./shared/database/datasource";
-import { AgentsModule } from "./modules/agents/agents.module";
-import { RespondersModule } from "./modules/responders/responders.module";
 import { AsyncContextMiddleware } from "./shared/async-context/middleware";
 import { AsyncContextModule } from "./shared/async-context/module";
 import { LoggerModule } from "./shared/logger/module";
 import { Logger } from "./shared/logger/service";
 import { QueueModule } from "./shared/queue/module";
 import { EmailModule } from "./shared/email/module";
+// import { WebSocketModule } from "./shared/websocket/module";
 import { TokenEncryption } from "./shared/utils/token-encryption.util";
 import { EnvVariables } from "./utils/env.validate";
 
@@ -56,8 +55,6 @@ import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categ
 		AuthModule,
 		UsersModule,
 		UtilsModule,
-		AgentsModule,
-		RespondersModule,
 		AsyncContextModule,
 		LoggerModule,
 		EmailModule,

@@ -15,15 +15,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 	}
 
 	validate(payload: any) {
-		// Check if this is an agent payload (has agentId)
-		if ("agentId" in payload) {
-			return {
-				...payload,
-				type: "agent",
-			};
-		}
-
-		// This is a user payload (has email)
+		// This is a user payload
 		return {
 			...payload,
 			type: "user",

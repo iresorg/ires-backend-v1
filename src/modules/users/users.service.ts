@@ -32,6 +32,68 @@ export class UsersService {
 		return users;
 	}
 
+	async findByRole(role: Role): Promise<IUser[]> {
+		const users = await this.usersRepository.findUsersByRole(role);
+		return users;
+	}
+
+	async findByRoles(roles: Role[]): Promise<IUser[]> {
+		// For now, we'll fetch users by each role and combine them
+		// This can be optimized later by adding a findByRoles method to the repository
+		const allUsers: IUser[] = [];
+		for (const role of roles) {
+			const users = await this.usersRepository.findUsersByRole(role);
+			allUsers.push(...users);
+		}
+		return allUsers;
+	}
+
+	async findAllPaginated(
+		page: number,
+		limit: number,
+	): Promise<{ users: IUser[]; total: number; totalPages: number }> {
+		const skip = (page - 1) * limit;
+		const [users, total] = await this.usersRepository.findAllPaginated(
+			skip,
+			limit,
+		);
+		const totalPages = Math.ceil(total / limit);
+
+		return { users, total, totalPages };
+	}
+
+	async findByRolePaginated(
+		role: Role,
+		page: number,
+		limit: number,
+	): Promise<{ users: IUser[]; total: number; totalPages: number }> {
+		const skip = (page - 1) * limit;
+		const [users, total] = await this.usersRepository.findByRolePaginated(
+			role,
+			skip,
+			limit,
+		);
+		const totalPages = Math.ceil(total / limit);
+
+		return { users, total, totalPages };
+	}
+
+	async findByRolesPaginated(
+		roles: Role[],
+		page: number,
+		limit: number,
+	): Promise<{ users: IUser[]; total: number; totalPages: number }> {
+		const skip = (page - 1) * limit;
+		const [users, total] = await this.usersRepository.findByRolesPaginated(
+			roles,
+			skip,
+			limit,
+		);
+		const totalPages = Math.ceil(total / limit);
+
+		return { users, total, totalPages };
+	}
+
 	async findOne(filter: {
 		id?: string;
 		email?: string;
