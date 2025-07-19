@@ -13,8 +13,6 @@ import { AuthGuard } from "@/shared/guards/auth.guard";
 import { Public } from "@/shared/decorators/public.decorator";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
-import { AgentLoginDto } from "./dto/agent-login.dto";
-import { ResponderLoginDto } from "./dto/responder-login.dto";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @ApiTags("Auth")
@@ -36,40 +34,6 @@ export class AuthController {
 
 		return {
 			message: "Login successful",
-			data,
-		};
-	}
-
-	@Public()
-	@HttpCode(HttpStatus.OK)
-	@Post("agent-login")
-	@ApiOperation({ summary: "Agent login" })
-	@ApiResponse({
-		status: 200,
-		description: "Agent login successful",
-	})
-	async agentLogin(@Body() body: AgentLoginDto) {
-		const data = await this.authService.agentLogin(body);
-
-		return {
-			message: "Agent login successful",
-			data,
-		};
-	}
-
-	@Public()
-	@HttpCode(HttpStatus.OK)
-	@Post("responder-login")
-	@ApiOperation({ summary: "Responder login" })
-	@ApiResponse({
-		status: 200,
-		description: "Responder login successful",
-	})
-	async responderLogin(@Body() body: ResponderLoginDto) {
-		const data = await this.authService.responderLogin(body);
-
-		return {
-			message: "Responder login successful",
 			data,
 		};
 	}
