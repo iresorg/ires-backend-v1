@@ -1,8 +1,6 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { TicketSeverity, TicketTiers } from "../interfaces/ticket.interface";
-import { Transform } from "class-transformer";
-import { ResponderType } from "@/modules/responders/enums/responder-type.enum";
 
 export class EscalateTicketDto {
 	@ApiProperty({

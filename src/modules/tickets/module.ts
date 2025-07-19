@@ -6,8 +6,6 @@ import { Tickets } from "./entities/ticket.entity";
 import { TicketsController } from "./controller";
 import { TicketLifecycle } from "./entities/ticket-lifecycle.entity";
 import { UsersModule } from "@/modules/users/users.module";
-import { AgentsModule } from "../agents/agents.module";
-import { RespondersModule } from "../responders/responders.module";
 import { EmailModule } from "@/shared/email/module";
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { DatabaseModule } from "@/shared/database/datasource";
@@ -16,8 +14,6 @@ import { DatabaseModule } from "@/shared/database/datasource";
 	imports: [
 		TypeOrmModule.forFeature([Tickets, TicketLifecycle]),
 		UsersModule,
-		AgentsModule,
-		RespondersModule,
 		EmailModule,
 		DatabaseModule,
 	],

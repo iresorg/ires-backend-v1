@@ -9,8 +9,6 @@ import {
 } from "./interfaces/ticket.interface";
 import { UsersService } from "@/modules/users/users.service";
 import { TicketNotFoundError } from "@/shared/errors/ticket.errors";
-import { AgentsService } from "@/modules/agents/agents.service";
-import { RespondersService } from "@/modules/responders/responders.service";
 import { EmailService } from "@/shared/email/service";
 import { Role } from "../users/enums/role.enum";
 import { TicketsRepository } from "./repository";
@@ -27,8 +25,6 @@ export class TicketsService {
 		private readonly ticketsRepository: TicketsRepository,
 		private readonly ticketLifecyleRepo: TicketLifecycleRepository,
 		private readonly usersService: UsersService,
-		private readonly agentsService: AgentsService,
-		private readonly respondersService: RespondersService,
 		private readonly emailService: EmailService,
 		private readonly databaseService: TDatabaseService,
 	) {}

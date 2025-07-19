@@ -102,7 +102,13 @@ export enum TicketSeverity {
 
 export type ITicketCreate = Omit<
 	ITicket,
-	"status" | "createdAt" | "updatedAt" | "severity" | "createdBy" | "tier"
+	| "status"
+	| "createdAt"
+	| "updatedAt"
+	| "severity"
+	| "createdBy"
+	| "tier"
+	| "category"
 > & {
 	createdById: string;
 	categoryId: string;
