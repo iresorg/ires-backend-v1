@@ -6,10 +6,13 @@ import { ValidationPipe } from "@nestjs/common";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filters";
 import { Logger } from "./shared/logger/service";
 import { Response } from "express";
+import { ConfigService } from "@nestjs/config";
+import { EnvVariables } from "./utils/env.validate";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	const logger = await app.resolve(Logger);
+	const env = await app.resolve(ConfigService<EnvVariables>);
 	// app.useLogger(logger);
 
 	// Security middleware
@@ -77,7 +80,7 @@ async function bootstrap() {
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup("api", app, document);
 
-	await app.listen(3000);
+	await app.listen(env.get("PORT") ?? 3000);
 }
 
 bootstrap().catch((error) => {

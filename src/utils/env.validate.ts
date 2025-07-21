@@ -4,6 +4,7 @@ import {
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
+	IsOptional,
 	IsString,
 	validateSync,
 } from "class-validator";
@@ -81,6 +82,11 @@ export class EnvVariables {
 	@IsString()
 	@IsNotEmpty()
 	DEFAULT_SUPER_ADMIN_LAST_NAME: string;
+
+	@IsNumber()
+	@IsOptional()
+	@Transform(({ value }: { value: string }) => parseInt(value))
+	PORT: number;
 }
 
 export function validateEnv(env: Record<string, unknown>) {
