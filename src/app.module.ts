@@ -2,8 +2,6 @@ import {
 	MiddlewareConsumer,
 	Module,
 	NestModule,
-	OnModuleInit,
-	Inject,
 } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -19,28 +17,7 @@ import { Logger } from "./shared/logger/service";
 import { QueueModule } from "./shared/queue/module";
 import { EmailModule } from "./shared/email/module";
 // import { WebSocketModule } from "./shared/websocket/module";
-import { TokenEncryption } from "./shared/utils/token-encryption.util";
-import { EnvVariables } from "./utils/env.validate";
 
-class TokenEncryptionInitializer implements OnModuleInit {
-	constructor(
-		@Inject(ConfigService)
-		private readonly configService: ConfigService<EnvVariables>,
-	) {}
-
-	onModuleInit() {
-		try {
-			TokenEncryption.initialize(this.configService);
-			console.log("Token encryption service initialized successfully");
-		} catch (error) {
-			console.error(
-				"Failed to initialize token encryption service. Ensure TOKEN_ENCRYPTION_KEY is properly set in environment variables.",
-				error,
-			);
-			throw error;
-		}
-	}
-}
 import { TicketsModule } from "./modules/tickets/module";
 import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
 
@@ -62,7 +39,6 @@ import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categ
 		TicketsModule,
 		TicketCategoriesModule,
 	],
-	providers: [TokenEncryptionInitializer],
 })
 export class AppModule implements NestModule {
 	constructor(private readonly logger: Logger) {}

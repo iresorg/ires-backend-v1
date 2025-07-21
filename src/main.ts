@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { ValidationPipe } from "@nestjs/common";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filters";
 import { Logger } from "./shared/logger/service";
+import { Response } from "express";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
@@ -24,6 +25,22 @@ async function bootstrap() {
 			},
 		}),
 	);
+
+	app.getHttpAdapter().get("/", (_, res: Response) => {
+		res.status(200).json({
+			message: "Welcome to iRES Backend Server"
+		})
+	})
+
+	// setInterval(() => {
+	// 	const memoryUsage = process.memoryUsage();
+	// 	console.log('Memory Usage:', {
+	// 		res: (memoryUsage.rss /1024 /1024).toFixed(2) + "MB",
+	// 		heapTotal: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + 'MB',
+	// 		heapUsed: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + "MB",
+	// 		external: (memoryUsage.external / 1024 / 1024).toFixed(2) + 'MB'
+	// 	})
+	// }, 5000)
 
 	// Global validation pipe - using built-in NestJS pipe
 	app.useGlobalPipes(
