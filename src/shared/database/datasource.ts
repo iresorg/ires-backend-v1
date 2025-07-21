@@ -34,6 +34,11 @@ export function createDataSourceOptions(
 		migrationsTableName: "migrations",
 		synchronize: config.NODE_ENV !== Environment.Production,
 		logging: false,
+		...(config.DB_SSL && {
+			ssl: {
+				rejectUnauthorized: false
+			}
+		})
 	};
 }
 

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { plainToInstance, Transform } from "class-transformer";
 import {
+	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
 	IsNumber,
@@ -32,6 +33,10 @@ export class EnvVariables {
 
 	@IsString()
 	DB_USER: string;
+
+	@IsBoolean()
+	@Transform(({ value }: { value: string }) => value === "true")
+	DB_SSL: boolean;
 
 	@IsString()
 	DB_PASS: string;
