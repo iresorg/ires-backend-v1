@@ -5,6 +5,7 @@ import { Repository } from "typeorm";
 import { ITicketLifecycle } from "./interfaces/ticket.interface";
 import { ICreateTicketLifeCycle } from "./types";
 import { TDatabaseTransaction } from "@/shared/database/datasource";
+import { getPaginationMeta, PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
 
 @Injectable()
 export class TicketLifecycleRepository {
@@ -34,10 +35,13 @@ export class TicketLifecycleRepository {
 
 	async getByTicketId(
 		ticketId: string,
+		paginationQuery: Partial<PaginationQuery>,
 		trx?: TDatabaseTransaction,
-	): Promise<ITicketLifecycle[]> {
+	): Promise<PaginatedResponse<ITicketLifecycle>> {
 		const repo = this.getRepo(trx);
-		const lifecycle = await repo.find({
+		const { limit = 10, page = 1 } = paginationQuery;
+		const offset = (page - 1) * limit;
+		const [lifecycle, total] = await repo.findAndCount({
 			where: { ticket: { ticketId } },
 			relations: {
 				performedBy: true,
@@ -45,19 +49,25 @@ export class TicketLifecycleRepository {
 			order: {
 				createdAt: "DESC",
 			},
+			skip: offset,
+			take: limit
 		});
-		return lifecycle.map((lifecycle) => ({
-			id: lifecycle.id,
-			ticketId,
-			action: lifecycle.action,
-			notes: lifecycle.notes,
-			createdAt: lifecycle.createdAt,
-			performedBy: {
-				id: lifecycle.performedBy.id,
-				firstName: lifecycle.performedBy.firstName,
-				lastName: lifecycle.performedBy.lastName,
-				role: lifecycle.performedBy.role,
-			},
-		}));
+
+		return {
+			data: lifecycle.map((lifecycle) => ({
+				id: lifecycle.id,
+				ticketId,
+				action: lifecycle.action,
+				notes: lifecycle.notes,
+				createdAt: lifecycle.createdAt,
+				performedBy: {
+					id: lifecycle.performedBy.id,
+					firstName: lifecycle.performedBy.firstName,
+					lastName: lifecycle.performedBy.lastName,
+					role: lifecycle.performedBy.role,
+				},
+			})),
+			pagination: getPaginationMeta(total, page, limit)
+		};
 	}
 }

@@ -32,6 +32,8 @@ import { Role } from "../users/enums/role.enum";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { GetTicketDto } from "./dto/get-ticket.dto";
+import { PaginatedResponse } from "@/shared/utils/pagination";
+import { PaginationQuery } from "@/shared/dto/pagination.dto";
 
 @UseGuards(AuthGuard)
 @Controller("tickets")
@@ -85,14 +87,11 @@ export class TicketsController {
 		description: "Ticket life cycle fetched successfully",
 	})
 	@Get(":ticketId/lifecycle")
-	async getTicketLifecycle(@Param("ticketId") ticketId: string): Promise<{
-		message: string;
-		data: ITicketLifecycle[];
-	}> {
-		const data = await this.ticketsService.getTicketLifecycle(ticketId);
+	async getTicketLifecycle(@Param("ticketId") ticketId: string, @Query() query: PaginationQuery){
+		const data = await this.ticketsService.getTicketLifecycle(ticketId, query);
 		return {
 			message: "Ticket life cycle fetched successfully",
-			data,
+			...data,
 		};
 	}
 

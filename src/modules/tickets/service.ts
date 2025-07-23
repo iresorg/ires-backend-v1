@@ -268,8 +268,8 @@ export class TicketsService {
 		]);
 	}
 
-	async getTicketLifecycle(ticketId: string): Promise<ITicketLifecycle[]> {
-		return this.ticketLifecyleRepo.getByTicketId(ticketId);
+	async getTicketLifecycle(ticketId: string, query: PaginationQuery): Promise<PaginatedResponse<ITicketLifecycle>> {
+		return this.ticketLifecyleRepo.getByTicketId(ticketId, query);
 	}
 
 	generateTicketId(): string {

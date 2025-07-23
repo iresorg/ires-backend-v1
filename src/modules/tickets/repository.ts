@@ -93,6 +93,7 @@ export class TicketsRepository {
 			])
 			.offset(offset)
 			.limit(limit)
+			.orderBy("ticket.createdAt", "DESC")
 
 			if (status) {
 				query.where("ticket.status = :status", { status })
