@@ -6,12 +6,14 @@ import {
 	ITicket,
 	ITicketCreate,
 	ITicketLifecycle,
+	ITicketSummary,
 	IUpdateTicket,
 	TicketStatus,
 } from "./interfaces/ticket.interface";
 import { TicketLifecycle } from "./entities/ticket-lifecycle.entity";
 import { Role } from "../users/enums/role.enum";
 import { TDatabaseTransaction } from "@/shared/database/datasource";
+import { getPaginationMeta, PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
 
 @Injectable()
 export class TicketsRepository {
@@ -66,18 +68,42 @@ export class TicketsRepository {
 		return this.repo;
 	}
 
-	async getTickets(trx?: TDatabaseTransaction): Promise<ITicket[]> {
+	async getTickets(
+		filter: Partial<{ status: TicketStatus }>,
+		paginationQuery: Partial<PaginationQuery>,
+		trx?: TDatabaseTransaction
+	): Promise<PaginatedResponse<ITicketSummary>> {
+		const { status } = filter;
+		const { limit = 10, page = 1 } = paginationQuery;
+		const offset = (page - 1) * limit;
 		const repo = this.getRepo(trx);
-		const tickets = await repo.find({
-			relations: {
-				createdBy: true,
-				category: true,
-				subCategory: true,
-				assignedResponder: true,
-			},
-		});
-		console.log(tickets);
-		return tickets.map((ticket) => this.mapEntityToITicket(ticket));
+
+		const query = repo.createQueryBuilder("ticket")
+			.leftJoinAndSelect("ticket.category", "category")
+			.leftJoinAndSelect("ticket.subCategory", "subCategory")
+			.select([
+				"ticket.ticketId",
+				"ticket.tier",
+				"category",
+				"subCategory",
+				"ticket.createdAt",
+				"ticket.updatedAt",
+				"ticket.status",
+				"ticket.title",
+			])
+			.offset(offset)
+			.limit(limit)
+
+			if (status) {
+				query.where("ticket.status = :status", { status })
+			}
+
+		const [tickets, total] = await query.getManyAndCount();
+		console.log(tickets)
+		return {
+			data: tickets.map((ticket) => this.mapEntityToITicketSummary(ticket)),
+			pagination: getPaginationMeta(total, page, limit)
+		};
 	}
 
 	async updateTicket(
@@ -93,6 +119,31 @@ export class TicketsRepository {
 				assignedResponder: { id: updateBody.assignedResponderId },
 			}),
 		});
+	}
+
+	/**
+	 * Maps a Tickets entity to the ITicket interface.
+	 */
+	private mapEntityToITicketSummary(ticket: Tickets): ITicketSummary {
+		return {
+			ticketId: ticket.ticketId,
+			title: ticket.title,
+			tier: ticket.tier,
+			status: ticket.status,
+			severity: ticket.severity,
+			createdAt: ticket.createdAt,
+			updatedAt: ticket.updatedAt,
+			category: {
+				id: ticket.category?.id,
+				name: ticket.category?.name,
+				createdAt: ticket.category?.createdAt,
+			},
+			subCategory: {
+				id: ticket.subCategory?.id,
+				name: ticket.subCategory?.name,
+				createdAt: ticket.subCategory?.createdAt,
+			},
+		};
 	}
 
 	/**

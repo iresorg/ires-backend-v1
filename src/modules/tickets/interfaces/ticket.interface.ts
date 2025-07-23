@@ -32,6 +32,8 @@ export interface ContactInformation {
 	address: string;
 }
 
+export type ITicketSummary = Pick<ITicket, "ticketId" | "title" | "tier" | "status" | "severity" | "createdAt" | "updatedAt" | "category" | "subCategory">;
+
 export interface ITicket {
 	ticketId: string;
 	title: string;

@@ -7,12 +7,14 @@ import {
 	Req,
 	Patch,
 	UseGuards,
+	Query,
 } from "@nestjs/common";
 import { TicketsService } from "./service";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import {
 	ITicket,
 	ITicketLifecycle,
+	ITicketSummary,
 	TicketStatus,
 } from "./interfaces/ticket.interface";
 import { ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
@@ -29,6 +31,7 @@ import { AuthGuard } from "@/shared/guards/auth.guard";
 import { Role } from "../users/enums/role.enum";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { RoleGuard } from "@/shared/guards/roles.guard";
+import { GetTicketDto } from "./dto/get-ticket.dto";
 
 @UseGuards(AuthGuard)
 @Controller("tickets")
@@ -68,11 +71,11 @@ export class TicketsController {
 	@ApiOperation({ summary: "Get all tickets" })
 	@ApiResponse({ status: 200, description: "Tickets fetched successfully" })
 	@Get()
-	async getTickets(): Promise<{ message: string; data: ITicket[] }> {
-		const data = await this.ticketsService.getTickets();
+	async getTickets(@Query() query: GetTicketDto): Promise<{ message: string; data: ITicketSummary[] }> {
+		const data = await this.ticketsService.getTickets(query);
 		return {
 			message: "Tickets fetched successfully",
-			data,
+			...data,
 		};
 	}
 

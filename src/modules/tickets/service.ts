@@ -3,6 +3,7 @@ import {
 	ITicket,
 	ITicketCreate,
 	ITicketLifecycle,
+	ITicketSummary,
 	TicketSeverity,
 	TicketStatus,
 	TicketTiers,
@@ -18,6 +19,7 @@ import {
 } from "@/shared/database/datasource";
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { AssignResponder, ReassignTicket } from "./types";
+import { PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
 
 @Injectable()
 export class TicketsService {
@@ -82,8 +84,8 @@ export class TicketsService {
 		return ticket;
 	}
 
-	async getTickets(): Promise<ITicket[]> {
-		return this.ticketsRepository.getTickets();
+	async getTickets(query: Partial<PaginationQuery & { status: TicketStatus }>): Promise<PaginatedResponse<ITicketSummary>> {
+		return this.ticketsRepository.getTickets({ status: query.status }, { limit: query.limit, page: query.page });
 	}
 
 	async assignTicket(
