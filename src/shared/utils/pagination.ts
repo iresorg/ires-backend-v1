@@ -11,8 +11,8 @@ export interface PaginationResponse<T> {
 }
 
 export interface PaginationQuery {
-    limit: number;
-    page: number;
+    limit?: number;
+    page?: number;
 }
 
 export interface PaginationMeta {
