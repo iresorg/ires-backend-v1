@@ -28,7 +28,7 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
-import { PaginationDto } from "@/shared/dto/pagination.dto";
+import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
 
@@ -40,7 +40,7 @@ export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
 
 	@Get()
-	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
+	@Roles(Role.SUPER_ADMIN)
 	@ApiOperation({ summary: "Get all users with pagination" })
 	@ApiResponse({
 		status: 200,
@@ -62,42 +62,14 @@ export class UsersController {
 	})
 	async getUsers(
 		@Req() req: AuthRequest,
-		@Query() pagination: PaginationDto,
+		@Query() pagination: PaginationQuery,
 	): Promise<PaginationResult<UserResponseDto>> {
-		const { role: currentUserRole } = req.user;
-		let users: any[] = [];
-		let total = 0;
-
-		if (currentUserRole === Role.AGENT_ADMIN) {
-			const result = await this.usersService.findByRolePaginated(
-				Role.AGENT,
-				pagination.limit,
-				pagination.offset,
-			);
-			users = result.users;
-			total = result.total;
-		} else if (currentUserRole === Role.RESPONDER_ADMIN) {
-			const result = await this.usersService.findByRolesPaginated(
-				[Role.RESPONDER_TIER_1, Role.RESPONDER_TIER_2],
-				pagination.limit,
-				pagination.offset,
-			);
-			users = result.users;
-			total = result.total;
-		} else if (currentUserRole === Role.SUPER_ADMIN) {
-			const result = await this.usersService.findAllPaginated(
-				pagination.limit,
-				pagination.offset,
-			);
-			users = result.users;
-			total = result.total;
-		} else {
-			users = [];
-			total = 0;
-		}
-
-		const data = UserResponseDto.fromUsers(users);
-		return buildPaginationResult(data, total, pagination);
+		const page = pagination.page ?? 1;
+		const limit = pagination.limit ?? 10;
+		const offset = (page - 1) * limit;
+		const result = await this.usersService.findAllPaginated(limit, offset);
+		const data = UserResponseDto.fromUsers(result.users);
+		return buildPaginationResult(data, result.total, { page, limit });
 	}
 
 	@Get(":id")

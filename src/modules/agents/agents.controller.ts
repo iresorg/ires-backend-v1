@@ -15,7 +15,7 @@ import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { Role } from "../users/enums/role.enum";
-import { PaginationDto } from "@/shared/dto/pagination.dto";
+import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
 import { UserResponseDto } from "../users/dto/user-response.dto";
@@ -45,13 +45,16 @@ export class AgentsController {
 	@Get()
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
 	async getAgents(
-		@Query() pagination: PaginationDto,
+		@Query() pagination: PaginationQuery,
 	): Promise<PaginationResult<UserResponseDto>> {
+		const page = pagination.page ?? 1;
+		const limit = pagination.limit ?? 10;
+		const offset = (page - 1) * limit;
 		const { users, total } = await this.agentsService.findAgentsPaginated(
-			pagination.limit,
-			pagination.offset,
+			limit,
+			offset,
 		);
 		const data = UserResponseDto.fromUsers(users);
-		return buildPaginationResult(data, total, pagination);
+		return buildPaginationResult(data, total, { page, limit });
 	}
 }

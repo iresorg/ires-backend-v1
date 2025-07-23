@@ -1,20 +1,16 @@
-import { IsOptional, IsInt, Min } from "class-validator";
-import { Type } from "class-transformer";
+import { IsOptional, IsNumber, Min } from "class-validator";
+import { Transform } from "class-transformer";
 
-export class PaginationDto {
+export class PaginationQuery {
 	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
+	@IsNumber()
 	@Min(1)
-	page?: number = 1;
+	@Transform(({ value }: { value: string }) => parseInt(value))
+	page?: number;
 
 	@IsOptional()
-	@Type(() => Number)
-	@IsInt()
-	@Min(1)
-	limit?: number = 10;
-
-	get offset(): number {
-		return ((this.page ?? 1) - 1) * (this.limit ?? 10);
-	}
+	@IsNumber()
+	@Min(5)
+	@Transform(({ value }: { value: string }) => parseInt(value))
+	limit?: number;
 }
