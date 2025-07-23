@@ -1,8 +1,4 @@
-import {
-	MiddlewareConsumer,
-	Module,
-	NestModule,
-} from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -20,6 +16,8 @@ import { EmailModule } from "./shared/email/module";
 
 import { TicketsModule } from "./modules/tickets/module";
 import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
+import { AgentsModule } from "./modules/agents/agents.module";
+import { RespondersModule } from "./modules/responders/responders.module";
 
 @Module({
 	imports: [
@@ -38,6 +36,8 @@ import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categ
 		QueueModule,
 		TicketsModule,
 		TicketCategoriesModule,
+		AgentsModule,
+		RespondersModule,
 	],
 })
 export class AppModule implements NestModule {
