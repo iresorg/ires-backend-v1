@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { plainToInstance, Transform } from "class-transformer";
 import {
+	IsArray,
 	IsBoolean,
 	IsEnum,
 	IsNotEmpty,
@@ -92,6 +93,11 @@ export class EnvVariables {
 	@IsOptional()
 	@Transform(({ value }: { value: string }) => parseInt(value))
 	PORT: number;
+
+	@IsString({ each: true })
+	@IsArray()
+  	@Transform(({ value }: { value: string }) => value.split(","))
+	WHITELISTED_ORIGINS: string[];
 }
 
 export function validateEnv(env: Record<string, unknown>) {
