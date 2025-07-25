@@ -9,6 +9,7 @@ import { Response } from "express";
 import { ConfigService } from "@nestjs/config";
 import { EnvVariables } from "./utils/env.validate";
 import * as cors from "cors";
+import "./shared/database/seeder";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
