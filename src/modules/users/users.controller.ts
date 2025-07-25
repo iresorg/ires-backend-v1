@@ -28,6 +28,9 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
+import { PaginationQuery } from "@/shared/dto/pagination.dto";
+import { buildPaginationResult } from "@/shared/utils/pagination.util";
+import { PaginationResult } from "@/shared/types/pagination-result.type";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -37,7 +40,7 @@ export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
 
 	@Get()
-	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
+	@Roles(Role.SUPER_ADMIN)
 	@ApiOperation({ summary: "Get all users with pagination" })
 	@ApiResponse({
 		status: 200,
@@ -45,70 +48,28 @@ export class UsersController {
 		schema: {
 			type: "object",
 			properties: {
-				message: { type: "string" },
 				data: {
 					type: "array",
 					items: { $ref: "#/components/schemas/UserResponseDto" },
 				},
-				pagination: {
-					type: "object",
-					properties: {
-						page: { type: "number" },
-						limit: { type: "number" },
-						total: { type: "number" },
-						totalPages: { type: "number" },
-					},
-				},
+				total: { type: "number" },
+				limit: { type: "number" },
+				page: { type: "number" },
+				totalPages: { type: "number" },
+				nextPage: { type: "number", nullable: true },
 			},
 		},
 	})
 	async getUsers(
 		@Req() req: AuthRequest,
-		@Query("page") page: string = "1",
-		@Query("limit") limit: string = "10",
-	): Promise<{
-		message: string;
-		data: UserResponseDto[];
-		pagination: {
-			page: number;
-			limit: number;
-			total: number;
-			totalPages: number;
-		};
-	}> {
-		const { role: currentUserRole } = req.user;
-		const pageNum = parseInt(page, 10) || 1;
-		const limitNum = parseInt(limit, 10) || 10;
-
-		let result;
-		if (currentUserRole === Role.AGENT_ADMIN) {
-			result = await this.usersService.findByRolePaginated(
-				Role.AGENT,
-				pageNum,
-				limitNum,
-			);
-		} else if (currentUserRole === Role.RESPONDER_ADMIN) {
-			result = await this.usersService.findByRolesPaginated(
-				[Role.RESPONDER_TIER_1, Role.RESPONDER_TIER_2],
-				pageNum,
-				limitNum,
-			);
-		} else {
-			result = await this.usersService.findAllPaginated(pageNum, limitNum);
-		}
-
+		@Query() pagination: PaginationQuery,
+	): Promise<PaginationResult<UserResponseDto>> {
+		const page = pagination.page ?? 1;
+		const limit = pagination.limit ?? 10;
+		const offset = (page - 1) * limit;
+		const result = await this.usersService.findAllPaginated(limit, offset);
 		const data = UserResponseDto.fromUsers(result.users);
-
-		return {
-			message: "Users fetched successfully",
-			data,
-			pagination: {
-				page: pageNum,
-				limit: limitNum,
-				total: result.total,
-				totalPages: result.totalPages,
-			},
-		};
+		return buildPaginationResult(data, result.total, { page, limit });
 	}
 
 	@Get(":id")
@@ -340,7 +301,7 @@ export class UsersController {
 	@Put("profile")
 	@ApiOperation({
 		summary: "Update user profile",
-		description: "Update the current user's profile information.",
+		description: "Update the current user profile information.",
 	})
 	@ApiResponse({
 		status: 200,

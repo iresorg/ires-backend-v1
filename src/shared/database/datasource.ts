@@ -36,9 +36,9 @@ export function createDataSourceOptions(
 		logging: false,
 		...(config.DB_SSL && {
 			ssl: {
-				rejectUnauthorized: false
-			}
-		})
+				rejectUnauthorized: false,
+			},
+		}),
 	};
 }
 
