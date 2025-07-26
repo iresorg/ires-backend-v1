@@ -275,4 +275,11 @@ export class TicketsService {
 	generateTicketId(): string {
 		return `iRS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
 	}
+
+	async escalationHistory(query: PaginationQuery): Promise<PaginatedResponse<ITicketLifecycle>> {
+		return this.ticketLifecyleRepo.getAll(
+			{action: TicketStatus.ESCALATED},
+			query
+		)
+	}
 }

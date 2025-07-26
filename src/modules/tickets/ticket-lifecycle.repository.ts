@@ -70,4 +70,46 @@ export class TicketLifecycleRepository {
 			pagination: getPaginationMeta(total, page, limit)
 		};
 	}
+
+	async getAll(
+		filter: Partial<ITicketLifecycle> = {},
+		paginationQuery: Partial<PaginationQuery>,
+		trx?: TDatabaseTransaction,
+	): Promise<PaginatedResponse<ITicketLifecycle>> {
+		const repo = this.getRepo(trx);
+		const { action } = filter;
+		const { limit = 10, page = 1 } = paginationQuery;
+		const offset = (page - 1) * limit;
+		const [lifecycle, total] = await repo.findAndCount({
+			relations: {
+				ticket: true,
+				performedBy: true,
+			},
+			where: {
+				...(action && { action })
+			},
+			order: {
+				createdAt: "DESC",
+			},
+			skip: offset,
+			take: limit
+		});
+
+		return {
+			data: lifecycle.map((lifecycle) => ({
+				id: lifecycle.id,
+				ticketId: lifecycle.ticket.ticketId,
+				action: lifecycle.action,
+				notes: lifecycle.notes,
+				createdAt: lifecycle.createdAt,
+				performedBy: {
+					id: lifecycle.performedBy.id,
+					firstName: lifecycle.performedBy.firstName,
+					lastName: lifecycle.performedBy.lastName,
+					role: lifecycle.performedBy.role,
+				},
+			})),
+			pagination: getPaginationMeta(total, page, limit)
+		};
+	}
 }

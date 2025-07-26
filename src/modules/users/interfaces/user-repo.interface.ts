@@ -14,7 +14,7 @@ export interface IUserRepository {
 	 */
 	create(body: IUserCreate): Promise<IUser>;
 	/**
-	 * @throws {UserNotFoundError}
+	 * t@throws {UserNotFoundError}
 	 */
 	update(id: string, user: Partial<IUser>): Promise<IUser>;
 	/**

@@ -57,6 +57,19 @@ export class TicketsController {
 		};
 	}
 
+	@ApiOperation({ summary: "Get escalation history of tickets" })
+	@ApiResponse({ status: 200, description: "Escalation history fetched" })
+	@Get("escalation-history")
+	async escalationHistory(
+		@Query() query: PaginationQuery,
+	): Promise<{ message: string; data: ITicketLifecycle[] }> {
+		const data = await this.ticketsService.escalationHistory(query);
+		return {
+			message: "Escalation history fetched successfully",
+			...data,
+		};
+	}
+
 	@ApiOperation({ summary: "Get a ticket by id" })
 	@ApiResponse({ status: 200, description: "Ticket fetched successfully" })
 	@Get(":ticketId")
