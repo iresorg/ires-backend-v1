@@ -59,6 +59,8 @@ export class TicketsController {
 
 	@ApiOperation({ summary: "Get escalation history of tickets" })
 	@ApiResponse({ status: 200, description: "Escalation history fetched" })
+	@Roles(Role.RESPONDER_ADMIN, Role.SUPER_ADMIN)
+	@UseGuards(RoleGuard)
 	@Get("escalation-history")
 	async escalationHistory(
 		@Query() query: PaginationQuery,
