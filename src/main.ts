@@ -15,32 +15,41 @@ async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	const logger = await app.resolve(Logger);
 	const env = await app.resolve(ConfigService<EnvVariables>);
-	
+
 	const WHITELISTED_ORIGINS = env.get<string[]>("WHITELISTED_ORIGINS");
-  
+
 	app.use(
-	  cors({
-		origin(requestOrigin, callback) {
-		  const originIsWhitelisted = WHITELISTED_ORIGINS?.some(
-			(origin) =>
-			  origin.toLowerCase().trim() === requestOrigin?.toLowerCase(),
-		  );
-  
-		  callback(null, originIsWhitelisted);
-		},
-		credentials: true,
-		optionsSuccessStatus: 200,
-		maxAge: 86400,
-		methods: ["PUT", "POST", "GET", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-		allowedHeaders: [
-		  "Content-Type",
-		  "Authorization",
-		  "Content-Length",
-		  "Access-Control-Allow-Origin",
-		  "Origin",
-		  "Accept",
-		],
-	  }),
+		cors({
+			origin(requestOrigin, callback) {
+				const originIsWhitelisted = WHITELISTED_ORIGINS?.some(
+					(origin) =>
+						origin.toLowerCase().trim() ===
+						requestOrigin?.toLowerCase(),
+				);
+
+				callback(null, originIsWhitelisted);
+			},
+			credentials: true,
+			optionsSuccessStatus: 200,
+			maxAge: 86400,
+			methods: [
+				"PUT",
+				"POST",
+				"GET",
+				"DELETE",
+				"PATCH",
+				"HEAD",
+				"OPTIONS",
+			],
+			allowedHeaders: [
+				"Content-Type",
+				"Authorization",
+				"Content-Length",
+				"Access-Control-Allow-Origin",
+				"Origin",
+				"Accept",
+			],
+		}),
 	);
 
 	// Security middleware
@@ -59,9 +68,9 @@ async function bootstrap() {
 
 	app.getHttpAdapter().get("/", (_, res: Response) => {
 		res.status(200).json({
-			message: "Welcome to iRES Backend Server"
-		})
-	})
+			message: "Welcome to iRES Backend Server",
+		});
+	});
 
 	// setInterval(() => {
 	// 	const memoryUsage = process.memoryUsage();
