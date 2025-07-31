@@ -22,12 +22,26 @@ export class RespondersService {
 		});
 	}
 
-	async findRespondersPaginated(limit: number, offset: number) {
+	async findRespondersPaginated(page: number, limit: number) {
 		// Fetch both responder tiers
 		return this.usersService.findByRolesPaginated(
 			[Role.RESPONDER_TIER_1, Role.RESPONDER_TIER_2],
+			page,
 			limit,
-			offset,
 		);
+	}
+
+	async searchResponders(search: string) {
+		// Search responders by name or email
+		// For now, we'll search in both responder tiers
+		const tier1Responders = await this.usersService.findByRoleAndSearch(
+			Role.RESPONDER_TIER_1,
+			search,
+		);
+		const tier2Responders = await this.usersService.findByRoleAndSearch(
+			Role.RESPONDER_TIER_2,
+			search,
+		);
+		return [...tier1Responders, ...tier2Responders];
 	}
 }

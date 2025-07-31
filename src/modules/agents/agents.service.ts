@@ -16,9 +16,8 @@ export class AgentsService {
 		});
 	}
 
-	async findAgentsPaginated(limit: number, offset: number) {
+	async findAgentsPaginated(page: number, limit: number) {
 		// Reuse usersService to fetch only AGENT users
-		const page = offset === 0 ? 1 : Math.floor(offset / limit) + 1;
 		const result = await this.usersService.findByRolePaginated(
 			Role.AGENT,
 			page,

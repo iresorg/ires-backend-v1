@@ -59,19 +59,12 @@ export class AgentsController {
 			return UserResponseDto.fromUsers(users);
 		}
 
-		// If no pagination parameters, return all agents
-		if (!pagination.page && !pagination.limit) {
-			const users = await this.agentsService.findAllAgents();
-			return UserResponseDto.fromUsers(users);
-		}
-
-		// Otherwise, return paginated results
+		// Always return paginated results (with defaults if not provided)
 		const page = pagination.page ?? 1;
 		const limit = pagination.limit ?? 10;
-		const offset = (page - 1) * limit;
 		const { users, total } = await this.agentsService.findAgentsPaginated(
+			page,
 			limit,
-			offset,
 		);
 		const data = UserResponseDto.fromUsers(users);
 		return buildPaginationResult(data, total, { page, limit });

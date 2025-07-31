@@ -41,7 +41,11 @@ export class UsersController {
 
 	@Get()
 	@Roles(Role.SUPER_ADMIN)
-	@ApiOperation({ summary: "Get all users with pagination" })
+	@ApiOperation({
+		summary: "Get all users with pagination, search, and role filtering",
+		description:
+			"Get users with optional search by name/email and role filtering. Supports pagination.",
+	})
 	@ApiResponse({
 		status: 200,
 		description: "Paginated list of users",
@@ -66,8 +70,17 @@ export class UsersController {
 	): Promise<PaginationResult<UserResponseDto>> {
 		const page = pagination.page ?? 1;
 		const limit = pagination.limit ?? 10;
-		const offset = (page - 1) * limit;
-		const result = await this.usersService.findAllPaginated(limit, offset);
+
+		// Prepare filters
+		const filters: { role?: Role; search?: string } = {};
+		if (pagination.role) filters.role = pagination.role;
+		if (pagination.search) filters.search = pagination.search;
+
+		const result = await this.usersService.findAllPaginated(
+			page,
+			limit,
+			filters,
+		);
 		const data = UserResponseDto.fromUsers(result.users);
 		return buildPaginationResult(data, result.total, { page, limit });
 	}

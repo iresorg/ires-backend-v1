@@ -18,6 +18,7 @@ export interface IUserRepository {
 		limit: number,
 	): Promise<[IUser[], number]>;
 	findByRoleAndSearch(role: Role, search: string): Promise<IUser[]>;
+	findBySearch(search: string): Promise<IUser[]>;
 	/**
 	 * @throws {UserAlreadyExistsError}
 	 */

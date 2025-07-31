@@ -59,15 +59,49 @@ export class UsersService {
 	async findAllPaginated(
 		page: number,
 		limit: number,
+		filters?: { role?: Role; search?: string },
 	): Promise<{ users: IUser[]; total: number; totalPages: number }> {
 		const skip = (page - 1) * limit;
-		const [users, total] = await this.usersRepository.findAllPaginated(
-			skip,
-			limit,
-		);
-		const totalPages = Math.ceil(total / limit);
 
-		return { users, total, totalPages };
+		// If we have filters, use the appropriate method
+		if (filters?.role && filters?.search) {
+			// Both role and search filters
+			const users = await this.findByRoleAndSearch(
+				filters.role,
+				filters.search,
+			);
+			const total = users.length;
+			const totalPages = Math.ceil(total / limit);
+			const paginatedUsers = users.slice(skip, skip + limit);
+			return { users: paginatedUsers, total, totalPages };
+		} else if (filters?.role) {
+			// Only role filter
+			const [users, total] =
+				await this.usersRepository.findByRolePaginated(
+					filters.role,
+					skip,
+					limit,
+				);
+			const totalPages = Math.ceil(total / limit);
+			return { users, total, totalPages };
+		} else if (filters?.search) {
+			// Only search filter
+			const users = await this.usersRepository.findBySearch(
+				filters.search,
+			);
+			const total = users.length;
+			const totalPages = Math.ceil(total / limit);
+			const paginatedUsers = users.slice(skip, skip + limit);
+			return { users: paginatedUsers, total, totalPages };
+		} else {
+			// No filters - use default pagination
+			const [users, total] = await this.usersRepository.findAllPaginated(
+				skip,
+				limit,
+			);
+			const totalPages = Math.ceil(total / limit);
+			return { users, total, totalPages };
+		}
 	}
 
 	async findByRolePaginated(

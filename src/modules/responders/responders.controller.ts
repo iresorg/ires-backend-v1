@@ -51,12 +51,20 @@ export class RespondersController {
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
 	async getResponders(
 		@Query() pagination: PaginationQuery,
-	): Promise<PaginationResult<UserResponseDto>> {
+	): Promise<PaginationResult<UserResponseDto> | UserResponseDto[]> {
+		// If search is provided, return all matching responders without pagination
+		if (pagination.search) {
+			const users = await this.respondersService.searchResponders(
+				pagination.search,
+			);
+			return UserResponseDto.fromUsers(users);
+		}
+
+		// Always return paginated results (with defaults if not provided)
 		const page = pagination.page ?? 1;
 		const limit = pagination.limit ?? 10;
-		const offset = (page - 1) * limit;
 		const { users, total } =
-			await this.respondersService.findRespondersPaginated(limit, offset);
+			await this.respondersService.findRespondersPaginated(page, limit);
 		const data = UserResponseDto.fromUsers(users);
 		return buildPaginationResult(data, total, { page, limit });
 	}
