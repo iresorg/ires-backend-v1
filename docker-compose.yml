@@ -2,7 +2,7 @@ services:
   postgres_db:
     image: postgres:latest
     ports:
-      - 5433:5432
+      - 5432:5432
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=ires
@@ -10,31 +10,6 @@ services:
     volumes:
       - db:/var/lib/postgresql/data
 
-  queue:
-    image: rabbitmq:latest
-    container_name: queue
-    restart: always
-    ports:
-      - 5673:5672
-      - 15672:15672
-    environment:
-      - RABBITMQ_DEFAULT_USER=ires
-      - RABBITMQ_DEFAULT_PASS=ires
-    configs:
-      - source: rabbitmq-plugins
-        target: /etc/rabbitmq/enabled_plugins
-    volumes:
-      - rabbitmq-lib:/var/lib/rabbitmq/
-      - rabbitmq-log:/var/log/rabbitmq
-
-configs:
-  rabbitmq-plugins:
-    content: "[rabbitmq_management]."
-
 volumes:
   db:
-    driver: local
-  rabbitmq-lib:
-    driver: local
-  rabbitmq-log:
     driver: local
