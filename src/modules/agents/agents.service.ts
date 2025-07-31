@@ -1,85 +1,85 @@
-import { Injectable } from "@nestjs/common";
-import { UsersService } from "../users/users.service";
-import { Role } from "../users/enums/role.enum";
-import { IUserCreate } from "../users/interfaces/user.interface";
-import { CreateAgentDto } from "./dto/create-agent.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Agent } from './entities/agent.entity';
+import { AgentToken } from './entities/agent-token.entity';
+import { AgentRepository } from './repositories/agent.repository';
+import { AgentTokenRepository } from './repositories/agent.repository';
+import * as bcrypt from 'bcrypt';
+import { CreateAgentDto } from './dto/create-agent.dto';
+import { UpdateAgentStatusDto } from './dto/update-agent-status.dto';
+import { GenerateTokenDto } from './dto/generate-token.dto';
 
 @Injectable()
 export class AgentsService {
-	constructor(private readonly usersService: UsersService) {}
+	constructor(
+		@InjectRepository(AgentRepository)
+		private agentRepository: AgentRepository,
+		@InjectRepository(AgentTokenRepository)
+		private agentTokenRepository: AgentTokenRepository,
+	) {}
 
-	async createAgent(createAgentDto: Omit<IUserCreate, "password">) {
-		// Reuse user creation logic, always set role to AGENT
-		return this.usersService.create({
-			...createAgentDto,
-			role: Role.AGENT,
+	async create(createAgentDto: CreateAgentDto): Promise<Agent> {
+		const agent = this.agentRepository.create(createAgentDto);
+		return this.agentRepository.save(agent);
+	}
+
+	async findAll(): Promise<Agent[]> {
+		return this.agentRepository.find();
+	}
+
+	async findActiveAgents(): Promise<Agent[]> {
+		return this.agentRepository.findActiveAgents();
+	}
+
+	async findOne(id: string): Promise<Agent> {
+		const agent = await this.agentRepository.findOne({ where: { id } });
+		if (!agent) {
+			throw new NotFoundException(`Agent with ID ${id} not found`);
+		}
+		return agent;
+	}
+
+	async updateStatus(
+		id: string,
+		updateStatusDto: UpdateAgentStatusDto,
+	): Promise<Agent> {
+		const agent = await this.findOne(id);
+		agent.isActive = updateStatusDto.isActive;
+		return this.agentRepository.save(agent);
+	}
+
+	async generateToken(
+		agentId: string,
+		generateTokenDto: GenerateTokenDto,
+	): Promise<string> {
+		const agent = await this.findOne(agentId);
+
+		// Generate a random token
+		const token = Math.random().toString(36).substring(2, 15);
+		const tokenHash = await bcrypt.hash(token, 10);
+
+		// Create new token record
+		const agentToken = this.agentTokenRepository.create({
+			agent,
+			tokenHash,
+			expiresAt: generateTokenDto.expiresAt,
 		});
+
+		await this.agentTokenRepository.save(agentToken);
+		return token;
 	}
 
-	async findAgentsPaginated(limit: number, offset: number) {
-		// Reuse usersService to fetch only AGENT users
-		const page = offset === 0 ? 1 : Math.floor(offset / limit) + 1;
-		const result = await this.usersService.findByRolePaginated(
-			Role.AGENT,
-			page,
-			limit,
-		);
-		return { users: result.users, total: result.total };
+	async validateToken(agentId: string, token: string): Promise<boolean> {
+		const activeToken =
+			await this.agentTokenRepository.findActiveToken(agentId);
+		if (!activeToken) {
+			return false;
+		}
+
+		return bcrypt.compare(token, activeToken.tokenHash);
 	}
 
-	async findAllAgents() {
-		// Get all agents without pagination
-		return this.usersService.findByRole(Role.AGENT);
-	}
-
-	async searchAgents(search: string) {
-		// Search agents by name or email
-		return await this.usersService.findByRoleAndSearch(Role.AGENT, search);
-	}
-
-	async findAgentById(id: string) {
-		// Find a specific agent by ID
-		const user = await this.usersService.findOne({ id });
-		return user && user.role === Role.AGENT ? user : null;
-	}
-
-	async updateAgent(id: string, updateAgentDto: Partial<CreateAgentDto>) {
-		// Update agent - ensure role remains AGENT
-		const updateData = {
-			...updateAgentDto,
-			role: Role.AGENT, // Always ensure role is AGENT
-		};
-		return await this.usersService.update(id, updateData);
-	}
-
-	async deleteAgent(id: string) {
-		// Delete agent
-		return await this.usersService.delete(id);
-	}
-
-	async activateAgent(
-		id: string,
-		activatedBy: string,
-		activatedByRole: Role,
-	) {
-		// Activate agent
-		return await this.usersService.activateUser(
-			id,
-			activatedBy,
-			activatedByRole,
-		);
-	}
-
-	async deactivateAgent(
-		id: string,
-		deactivatedBy: string,
-		deactivatedByRole: Role,
-	) {
-		// Deactivate agent
-		return await this.usersService.deactivateUser(
-			id,
-			deactivatedBy,
-			deactivatedByRole,
-		);
+	async revokeToken(agentId: string): Promise<void> {
+		await this.agentTokenRepository.revokeAllTokens(agentId);
 	}
 }

@@ -1,12 +1,18 @@
 import { Module } from '@nestjs/common';
-import { AgentsController } from './agents.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Agent } from './entities/agent.entity';
+import { AgentToken } from './entities/agent-token.entity';
 import { AgentsService } from './agents.service';
-import { UsersModule } from '../users/users.module';
+import { AgentsController } from './agents.controller';
+import {
+	AgentRepository,
+	AgentTokenRepository,
+} from './repositories/agent.repository';
 
 @Module({
-  imports: [UsersModule],
-  controllers: [AgentsController],
-  providers: [AgentsService],
-  exports: [AgentsService],
+	imports: [TypeOrmModule.forFeature([Agent, AgentToken])],
+	controllers: [AgentsController],
+	providers: [AgentsService, AgentRepository, AgentTokenRepository],
+	exports: [AgentsService],
 })
 export class AgentsModule {}
