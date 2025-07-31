@@ -7,8 +7,17 @@ export interface IUserRepository {
 	findAll(filter: { role?: Role }): Promise<IUser[]>;
 	findUsersByRole(role: Role): Promise<IUser[]>;
 	findAllPaginated(skip: number, limit: number): Promise<[IUser[], number]>;
-	findByRolePaginated(role: Role, skip: number, limit: number): Promise<[IUser[], number]>;
-	findByRolesPaginated(roles: Role[], skip: number, limit: number): Promise<[IUser[], number]>;
+	findByRolePaginated(
+		role: Role,
+		skip: number,
+		limit: number,
+	): Promise<[IUser[], number]>;
+	findByRolesPaginated(
+		roles: Role[],
+		skip: number,
+		limit: number,
+	): Promise<[IUser[], number]>;
+	findByRoleAndSearch(role: Role, search: string): Promise<IUser[]>;
 	/**
 	 * @throws {UserAlreadyExistsError}
 	 */

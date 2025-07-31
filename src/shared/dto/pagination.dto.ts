@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, Min } from "class-validator";
+import { IsOptional, IsNumber, Min, IsString } from "class-validator";
 import { Transform } from "class-transformer";
 
 export class PaginationQuery {
@@ -13,4 +13,8 @@ export class PaginationQuery {
 	@Min(5)
 	@Transform(({ value }: { value: string }) => parseInt(value))
 	limit?: number;
+
+	@IsOptional()
+	@IsString()
+	search?: string;
 }

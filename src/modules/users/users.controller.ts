@@ -72,6 +72,30 @@ export class UsersController {
 		return buildPaginationResult(data, result.total, { page, limit });
 	}
 
+	@Get("profile")
+	@ApiOperation({ summary: "Get user profile" })
+	@ApiResponse({
+		status: 200,
+		description: "User profile",
+		type: UserResponseDto,
+	})
+	async getUserProfile(
+		@Req() req: AuthRequest,
+	): Promise<{ message: string; data: UserResponseDto }> {
+		const { id } = req.user;
+		const user = await this.usersService.findOne({ id });
+
+		if (!user)
+			throw new NotFoundException(
+				"User not found. Please check and try again later.",
+			);
+
+		return {
+			message: "User profile fetched successfully",
+			data: UserResponseDto.fromUser(user),
+		};
+	}
+
 	@Get(":id")
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
 	@ApiOperation({ summary: "Get user by ID" })
@@ -156,6 +180,38 @@ export class UsersController {
 
 		return {
 			message: "User created successfully",
+		};
+	}
+
+	@Put("profile")
+	@ApiOperation({
+		summary: "Update user profile",
+		description: "Update the current user profile information.",
+	})
+	@ApiResponse({
+		status: 200,
+		description: "User profile updated successfully",
+		type: UserResponseDto,
+	})
+	async updateUserProfile(
+		@Req() req: AuthRequest,
+		@Body() updateUserDto: Partial<CreateUserDto>,
+	): Promise<{ message: string; data: UserResponseDto }> {
+		const { id } = req.user;
+
+		const user = await this.usersService.update(id, {
+			firstName: updateUserDto.firstName,
+			lastName: updateUserDto.lastName,
+		});
+
+		if (!user)
+			throw new NotFoundException(
+				"User not found. Please check and try again later.",
+			);
+
+		return {
+			message: "User profile updated successfully",
+			data: UserResponseDto.fromUser(user),
 		};
 	}
 
@@ -271,62 +327,6 @@ export class UsersController {
 
 		return {
 			message: "User deleted successfully",
-		};
-	}
-
-	@Get("profile")
-	@ApiOperation({ summary: "Get user profile" })
-	@ApiResponse({
-		status: 200,
-		description: "User profile",
-		type: UserResponseDto,
-	})
-	async getUserProfile(
-		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: UserResponseDto }> {
-		const { id } = req.user;
-		const user = await this.usersService.findOne({ id });
-
-		if (!user)
-			throw new NotFoundException(
-				"User not found. Please check and try again later.",
-			);
-
-		return {
-			message: "User profile fetched successfully",
-			data: UserResponseDto.fromUser(user),
-		};
-	}
-
-	@Put("profile")
-	@ApiOperation({
-		summary: "Update user profile",
-		description: "Update the current user profile information.",
-	})
-	@ApiResponse({
-		status: 200,
-		description: "User profile updated successfully",
-		type: UserResponseDto,
-	})
-	async updateUserProfile(
-		@Req() req: AuthRequest,
-		@Body() updateUserDto: Partial<CreateUserDto>,
-	): Promise<{ message: string; data: UserResponseDto }> {
-		const { id } = req.user;
-
-		const user = await this.usersService.update(id, {
-			firstName: updateUserDto.firstName,
-			lastName: updateUserDto.lastName,
-		});
-
-		if (!user)
-			throw new NotFoundException(
-				"User not found. Please check and try again later.",
-			);
-
-		return {
-			message: "User profile updated successfully",
-			data: UserResponseDto.fromUser(user),
 		};
 	}
 
