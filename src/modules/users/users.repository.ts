@@ -110,6 +110,25 @@ export class UserRepository implements IUserRepository {
 		return users.map((user) => this.mapToIUser(user));
 	}
 
+	async findBySearch(search: string): Promise<IUser[]> {
+		const users = await this.userRepo.find({
+			where: [
+				{
+					firstName: Like(`%${search}%`),
+				},
+				{
+					lastName: Like(`%${search}%`),
+				},
+				{
+					email: Like(`%${search}%`),
+				},
+			],
+			order: { createdAt: "DESC" },
+		});
+
+		return users.map((user) => this.mapToIUser(user));
+	}
+
 	async create(body: IUserCreate): Promise<IUser> {
 		const { email, firstName, lastName, password, role, avatar } = body;
 
