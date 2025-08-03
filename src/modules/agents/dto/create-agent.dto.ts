@@ -1,7 +1,16 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty } from "class-validator";
+import { Role } from "../../users/enums/role.enum";
 
 export class CreateAgentDto {
 	@IsNotEmpty()
-	@IsString()
-	userId: string;
+	firstName: string;
+
+	@IsNotEmpty()
+	lastName: string;
+
+	@IsEmail()
+	email: string;
+
+	// role is optional, always set to AGENT in service
+	role?: Role;
 }

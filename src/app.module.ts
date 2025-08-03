@@ -1,37 +1,49 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
-import { type EnvVariables, validateEnv } from './utils/env.validate';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './modules/users/entities/user.entity';
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { AuthModule } from "./modules/auth/auth.module";
+import { UsersModule } from "./modules/users/users.module";
+import { validateEnv } from "./utils/env.validate";
+import { UtilsModule } from "./utils/utils.module";
+import { JwtProviderModule } from "./shared/jwt.module";
+import { DatabaseModule } from "./shared/database/datasource";
+import { AsyncContextMiddleware } from "./shared/async-context/middleware";
+import { AsyncContextModule } from "./shared/async-context/module";
+import { LoggerModule } from "./shared/logger/module";
+import { Logger } from "./shared/logger/service";
+import { QueueModule } from "./shared/queue/module";
+import { EmailModule } from "./shared/email/module";
+// import { WebSocketModule } from "./shared/websocket/module";
+
+import { TicketsModule } from "./modules/tickets/module";
+import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
+import { AgentsModule } from "./modules/agents/agents.module";
+import { RespondersModule } from "./modules/responders/responders.module";
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      validate: validateEnv
-    }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService<EnvVariables>) => {
-        return {
-          type: 'postgres',
-          host: configService.get('DB_HOST'),
-          port: configService.get('DB_PORT'),
-          username: configService.get('DB_USER'),
-          password: configService.get('DB_PASS'),
-          database: configService.get('DB_NAME'),
-          entities: [
-            User
-          ],
-          synchronize: configService.get('NODE_ENV') !== 'production',
-        };
-      },
-      inject: [ConfigService],
-    }),
-    AuthModule,
-    UsersModule
-  ],
+	imports: [
+		ConfigModule.forRoot({
+			isGlobal: true,
+			validate: validateEnv,
+		}),
+		DatabaseModule,
+		JwtProviderModule,
+		AuthModule,
+		UsersModule,
+		UtilsModule,
+		AsyncContextModule,
+		LoggerModule,
+		EmailModule,
+		QueueModule,
+		TicketsModule,
+		TicketCategoriesModule,
+		AgentsModule,
+		RespondersModule,
+	],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+	constructor(private readonly logger: Logger) {}
+	configure(consumer: MiddlewareConsumer) {
+		consumer.apply(AsyncContextMiddleware).forRoutes("*");
+		consumer.apply(this.logger.logRequestSummary()).forRoutes("*");
+	}
+}
