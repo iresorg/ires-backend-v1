@@ -37,6 +37,19 @@ export class UsersService {
 		return users;
 	}
 
+	async findByRoleAndSearch(role: Role, search: string): Promise<IUser[]> {
+		const users = await this.usersRepository.findByRoleAndSearch(
+			role,
+			search,
+		);
+		return users;
+	}
+
+	async findBySearch(search: string): Promise<IUser[]> {
+		const users = await this.usersRepository.findBySearch(search);
+		return users;
+	}
+
 	async findByRoles(roles: Role[]): Promise<IUser[]> {
 		// For now, we'll fetch users by each role and combine them
 		// This can be optimized later by adding a findByRoles method to the repository

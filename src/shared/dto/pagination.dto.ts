@@ -1,5 +1,6 @@
-import { IsOptional, IsNumber, Min } from "class-validator";
+import { IsOptional, IsNumber, Min, IsString, IsEnum } from "class-validator";
 import { Transform } from "class-transformer";
+import { Role } from "@/modules/users/enums/role.enum";
 
 export class PaginationQuery {
 	@IsOptional()
@@ -13,4 +14,12 @@ export class PaginationQuery {
 	@Min(5)
 	@Transform(({ value }: { value: string }) => parseInt(value))
 	limit?: number;
+
+	@IsOptional()
+	@IsString()
+	search?: string;
+
+	@IsOptional()
+	@IsEnum(Role)
+	role?: Role;
 }
