@@ -3,6 +3,7 @@ import {
 	Inject,
 	Injectable,
 	NotFoundException,
+	ForbiddenException,
 } from "@nestjs/common";
 import type {
 	IUser,
@@ -125,6 +126,24 @@ export class UsersService {
 	): Promise<IUser | null> {
 		const user = await this.usersRepository.findById(id);
 		if (!user) throw new NotFoundException("User not found.");
+
+		// Restrict role update to admins only and prevent updating to SUPER_ADMIN
+		if (
+			updateUserDto.role &&
+			![
+				Role.SUPER_ADMIN,
+				Role.AGENT_ADMIN,
+				Role.RESPONDER_ADMIN,
+			].includes(user.role)
+		) {
+			throw new ForbiddenException("Only admins can update user roles.");
+		}
+		if (updateUserDto.role === Role.SUPER_ADMIN) {
+			throw new ForbiddenException(
+				"Cannot update user to SUPER_ADMIN role.",
+			);
+		}
+
 		try {
 			const updatedUser = await this.usersRepository.update(
 				id,
@@ -148,6 +167,7 @@ export class UsersService {
 				lastName: createUserDto.lastName,
 				email: createUserDto.email,
 				role: createUserDto.role,
+				avatar: createUserDto.avatar,
 				password: await this.utils.createHash(password),
 			});
 

@@ -31,6 +31,7 @@ import { RoleGuard } from "@/shared/guards/roles.guard";
 import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
+import { UpdateUserDto } from "./dto/create-user.dto";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -241,7 +242,7 @@ export class UsersController {
 	})
 	async updateUserProfile(
 		@Req() req: AuthRequest,
-		@Body() updateUserDto: Partial<CreateUserDto>,
+		@Body() updateUserDto: UpdateUserDto,
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const { id } = req.user;
 
@@ -271,7 +272,7 @@ export class UsersController {
 	})
 	async updateUser(
 		@Param("id") id: string,
-		@Body() updateUserDto: Partial<CreateUserDto>,
+		@Body() updateUserDto: UpdateUserDto,
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const { role: currentUserRole } = req.user;
