@@ -223,6 +223,7 @@ export class UsersController {
 			lastName: createUserDto.lastName,
 			email: createUserDto.email,
 			role: createUserDto.role,
+			avatar: createUserDto.avatar,
 		});
 
 		return {
@@ -246,10 +247,7 @@ export class UsersController {
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const { id } = req.user;
 
-		const user = await this.usersService.update(id, {
-			firstName: updateUserDto.firstName,
-			lastName: updateUserDto.lastName,
-		});
+		const user = await this.usersService.update(id, updateUserDto);
 
 		if (!user)
 			throw new NotFoundException(
