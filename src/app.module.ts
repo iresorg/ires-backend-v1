@@ -18,6 +18,7 @@ import { TicketsModule } from "./modules/tickets/module";
 import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
 import { AgentsModule } from "./modules/agents/agents.module";
 import { RespondersModule } from "./modules/responders/responders.module";
+import { CloudinaryModule } from "./modules/cloudinary/module";
 
 @Module({
 	imports: [
@@ -38,6 +39,7 @@ import { RespondersModule } from "./modules/responders/responders.module";
 		TicketCategoriesModule,
 		AgentsModule,
 		RespondersModule,
+		CloudinaryModule,
 	],
 })
 export class AppModule implements NestModule {
