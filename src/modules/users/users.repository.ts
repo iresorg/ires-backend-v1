@@ -51,7 +51,7 @@ export class UserRepository implements IUserRepository {
 			skip,
 			take: limit,
 		});
-
+console.log(users)
 		return [users.map((user) => this.mapToIUser(user)), total];
 	}
 
