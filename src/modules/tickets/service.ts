@@ -20,6 +20,7 @@ import {
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { AssignResponder, ReassignTicket } from "./types";
 import { PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
+import { FileUploadService } from "../file-upload/service";
 
 @Injectable()
 export class TicketsService {
@@ -29,12 +30,20 @@ export class TicketsService {
 		private readonly usersService: UsersService,
 		private readonly emailService: EmailService,
 		private readonly databaseService: TDatabaseService,
+		private readonly fileUploadService: FileUploadService,
 	) {}
 
 	async createTicket(
 		body: Omit<ITicketCreate, "ticketId">,
+		attachments?: Express.Multer.File[],
 	): Promise<ITicket> {
 		const ticketId = this.generateTicketId();
+
+		if (attachments?.length) {
+			const result = await Promise.all(attachments.map((attachment) => this.fileUploadService.uploadImage(attachment)));
+			body.attachments = result.map((res) => res.secure_url);
+		}
+
 		await this.databaseService.withTransaction(async (trx) => {
 			await this.ticketsRepository.createTicket(
 				{ ...body, ticketId },

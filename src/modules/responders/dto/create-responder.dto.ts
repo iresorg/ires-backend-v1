@@ -17,7 +17,7 @@ export class CreateResponderDto {
 		{ require_protocol: true },
 		{ message: "Avatar must be a valid URL with protocol (http/https)" },
 	)
-	avatar?: string;
+	avatar?: { publicId: string; url: string };
 
 	role: Role; // Must be RESPONDER_TIER_1 or RESPONDER_TIER_2
 }

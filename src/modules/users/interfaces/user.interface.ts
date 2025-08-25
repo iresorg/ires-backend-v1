@@ -8,7 +8,10 @@ export interface IUser {
 	password: string;
 	role: Role;
 	status: string;
-	avatar: string;
+	avatar: {
+		publicId: string;
+		url: string;
+	};
 	createdAt: Date;
 	updatedAt: Date;
 	deletedAt?: Date;
@@ -21,16 +24,13 @@ export interface IUserCreate {
 	email: string;
 	password: string;
 	role: Role;
-	avatar?: string;
+	avatar?: {
+		publicId: string;
+		url: string;
+	};
 }
 
-export interface IUserUpdate {
-	firstName?: string;
-	lastName?: string;
-	email?: string;
-	password?: string;
-	role?: Role;
-	avatar?: string;
+export type IUserUpdate = IUserCreate &{
 	status?: string;
 }
 
