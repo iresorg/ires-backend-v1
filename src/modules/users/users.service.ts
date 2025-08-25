@@ -2,6 +2,7 @@ import {
 	ConflictException,
 	Injectable,
 	NotFoundException,
+	ForbiddenException,
 } from "@nestjs/common";
 import type {
 	IUser,
@@ -33,6 +34,19 @@ export class UsersService {
 
 	async findByRole(role: Role): Promise<IUser[]> {
 		const users = await this.usersRepository.findUsersByRole(role);
+		return users;
+	}
+
+	async findByRoleAndSearch(role: Role, search: string): Promise<IUser[]> {
+		const users = await this.usersRepository.findByRoleAndSearch(
+			role,
+			search,
+		);
+		return users;
+	}
+
+	async findBySearch(search: string): Promise<IUser[]> {
+		const users = await this.usersRepository.findBySearch(search);
 		return users;
 	}
 
@@ -118,7 +132,29 @@ export class UsersService {
 			updateUserDto.avatar = {
 				publicId: response.public_id,
 				url: response.secure_url,
-			}
+
+		// Restrict role update to admins only and prevent updating to SUPER_ADMIN
+		if (
+			updateUserDto.role &&
+			![
+				Role.SUPER_ADMIN,
+				Role.AGENT_ADMIN,
+				Role.RESPONDER_ADMIN,
+			].includes(user.role)
+		) {
+			throw new ForbiddenException("Only admins can update user roles.");
+		}
+		if (updateUserDto.role === Role.SUPER_ADMIN) {
+			throw new ForbiddenException(
+				"Cannot update user to SUPER_ADMIN role.",
+			);
+		}
+
+			const updatedUser = await this.usersRepository.update(
+				id,
+				updateUserDto,
+			);
+		  return updatedUser;
 		}
 
 		const updatedUser = await this.usersRepository.update(
@@ -145,6 +181,7 @@ export class UsersService {
 				lastName: createUserDto.lastName,
 				email: createUserDto.email,
 				role: createUserDto.role,
+				avatar: createUserDto.avatar,
 				password: await this.utils.createHash(password),
 				avatar: createUserDto.avatar
 			});
