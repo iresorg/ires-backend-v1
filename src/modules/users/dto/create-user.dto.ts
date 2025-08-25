@@ -44,7 +44,7 @@ export class CreateUserDto {
 		{ require_protocol: true },
 		{ message: "Avatar must be a valid URL with protocol (http/https)" },
 	)
-	avatar?: string;
+	avatar?: { publicId: string; url: string };
 
 	@ApiProperty({ description: "User role", enum: Role, required: false })
 	@IsEnum(Role)

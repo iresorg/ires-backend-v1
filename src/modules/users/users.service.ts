@@ -132,7 +132,8 @@ export class UsersService {
 			updateUserDto.avatar = {
 				publicId: response.public_id,
 				url: response.secure_url,
-
+			}
+		}
 		// Restrict role update to admins only and prevent updating to SUPER_ADMIN
 		if (
 			updateUserDto.role &&
@@ -148,13 +149,6 @@ export class UsersService {
 			throw new ForbiddenException(
 				"Cannot update user to SUPER_ADMIN role.",
 			);
-		}
-
-			const updatedUser = await this.usersRepository.update(
-				id,
-				updateUserDto,
-			);
-		  return updatedUser;
 		}
 
 		const updatedUser = await this.usersRepository.update(
@@ -181,7 +175,6 @@ export class UsersService {
 				lastName: createUserDto.lastName,
 				email: createUserDto.email,
 				role: createUserDto.role,
-				avatar: createUserDto.avatar,
 				password: await this.utils.createHash(password),
 				avatar: createUserDto.avatar
 			});

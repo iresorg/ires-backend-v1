@@ -381,30 +381,6 @@ export class UsersController {
 		};
 	}
 
-	@Get("profile")
-	@ApiOperation({ summary: "Get user profile" })
-	@ApiResponse({
-		status: 200,
-		description: "User profile",
-		type: UserResponseDto,
-	})
-	async getUserProfile(
-		@Req() req: AuthRequest,
-	): Promise<{ message: string; data: UserResponseDto }> {
-		const { id } = req.user;
-		const user = await this.usersService.findOne({ id });
-
-		if (!user)
-			throw new NotFoundException(
-				"User not found. Please check and try again later.",
-			);
-
-		return {
-			message: "User profile fetched successfully",
-			data: UserResponseDto.fromUser(user),
-		};
-	}
-
 	@Patch(":userId/activate")
 	@ApiParam({ name: "userId", description: "The ID of the user to activate" })
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
