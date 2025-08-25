@@ -1,13 +1,13 @@
 import { Controller, Get } from "@nestjs/common";
-import { CloudinaryService } from "./service";
+import { FileUploadService } from "./service";
 
 @Controller("cloudinary")
 export class CloudinaryController {
-    constructor(private readonly cloudinaryService: CloudinaryService) {}
+    constructor(private readonly FileUploadService: FileUploadService) {}
 
     @Get("upload-signature")
     async getUploadSignature() {
-        const data = await this.cloudinaryService.getUploadSignature();
+        const data = await this.FileUploadService.getUploadSignature();
 
         return {
             message: "Upload signature fetched successfully",

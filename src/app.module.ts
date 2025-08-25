@@ -18,7 +18,7 @@ import { TicketsModule } from "./modules/tickets/module";
 import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categories.module";
 import { AgentsModule } from "./modules/agents/agents.module";
 import { RespondersModule } from "./modules/responders/responders.module";
-import { CloudinaryModule } from "./modules/cloudinary/module";
+import { FileUploadModule } from "./modules/file-upload/module";
 
 @Module({
 	imports: [
@@ -39,7 +39,7 @@ import { CloudinaryModule } from "./modules/cloudinary/module";
 		TicketCategoriesModule,
 		AgentsModule,
 		RespondersModule,
-		CloudinaryModule,
+		FileUploadModule,
 	],
 })
 export class AppModule implements NestModule {
