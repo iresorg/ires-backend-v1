@@ -22,6 +22,15 @@ export class EnvVariables {
 	AMQP_URL: string;
 
 	@IsString()
+	CLOUDINARY_API_KEY: string;
+
+	@IsString()
+	CLOUDINARY_API_SECRET: string;
+
+	@IsString()
+	CLOUDINARY_CLOUD_NAME: string;
+
+	@IsString()
 	@IsEnum(Environment)
 	NODE_ENV: Environment;
 

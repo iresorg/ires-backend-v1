@@ -1,6 +1,5 @@
 import {
 	ConflictException,
-	Inject,
 	Injectable,
 	NotFoundException,
 	ForbiddenException,
@@ -11,21 +10,21 @@ import type {
 	IUserUpdate,
 } from "./interfaces/user.interface";
 import { UserAlreadyExistsError, UserNotFoundError } from "@/shared/errors";
-import { IUserRepository } from "./interfaces/user-repo.interface";
-import constants from "./constants/constants";
 import { Utils } from "@/utils/utils";
 import { EmailService } from "@/shared/email/service";
 import { Logger } from "@/shared/logger/service";
 import { Role } from "./enums/role.enum";
+import { UserRepository } from "./users.repository";
+import { FileUploadService } from "../file-upload/service";
 
 @Injectable()
 export class UsersService {
 	constructor(
-		@Inject(constants.USER_REPOSITORY)
-		private usersRepository: IUserRepository,
+		private usersRepository: UserRepository,
 		private readonly utils: Utils,
 		private readonly emailService: EmailService,
 		private readonly logger: Logger,
+		private readonly fileUpload: FileUploadService,
 	) {}
 
 	async findAll(filter: { role?: Role } = {}): Promise<IUser[]> {
@@ -122,11 +121,19 @@ export class UsersService {
 
 	async update(
 		id: string,
-		updateUserDto: IUserUpdate,
+		updateUserDto: Partial<IUserUpdate>,
+		avatar?: Express.Multer.File
 	): Promise<IUser | null> {
 		const user = await this.usersRepository.findById(id);
 		if (!user) throw new NotFoundException("User not found.");
 
+		if (avatar) {
+			const response = await this.fileUpload.uploadImage(avatar, user.avatar?.publicId);
+			updateUserDto.avatar = {
+				publicId: response.public_id,
+				url: response.secure_url,
+			}
+		}
 		// Restrict role update to admins only and prevent updating to SUPER_ADMIN
 		if (
 			updateUserDto.role &&
@@ -144,31 +151,32 @@ export class UsersService {
 			);
 		}
 
-		try {
-			const updatedUser = await this.usersRepository.update(
-				id,
-				updateUserDto,
-			);
-			return updatedUser;
-		} catch (error) {
-			if (error instanceof UserNotFoundError) {
-				throw new NotFoundException("User not found.");
-			}
-			throw error;
-		}
+		const updatedUser = await this.usersRepository.update(
+			id,
+			updateUserDto
+		);
+		return updatedUser;
 	}
 
-	async create(createUserDto: Omit<IUserCreate, "password">): Promise<IUser> {
+	async create(createUserDto: Omit<IUserCreate, "password">, avatar?: Express.Multer.File): Promise<IUser> {
 		try {
 			const password = this.utils.generatePassword(8);
+
+			if (avatar) {
+				const response = await this.fileUpload.uploadImage(avatar);
+				createUserDto.avatar = {
+					publicId: response.public_id,
+					url: response.secure_url,
+				}
+			}
 
 			const user = await this.usersRepository.create({
 				firstName: createUserDto.firstName,
 				lastName: createUserDto.lastName,
 				email: createUserDto.email,
 				role: createUserDto.role,
-				avatar: createUserDto.avatar,
 				password: await this.utils.createHash(password),
+				avatar: createUserDto.avatar
 			});
 
 			await this.emailService.sendWelcomeEmail(

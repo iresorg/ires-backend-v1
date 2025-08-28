@@ -23,7 +23,7 @@ export class UserResponseDto {
 	status: Status;
 
 	@ApiProperty({ required: false, description: "User avatar URL" })
-	avatar?: string;
+	avatar?: { publicId: string; url: string };
 
 	@ApiProperty({ required: false, description: "Last login timestamp" })
 	lastLogin?: Date;

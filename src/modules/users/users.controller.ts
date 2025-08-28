@@ -12,6 +12,8 @@ import {
 	UseGuards,
 	ForbiddenException,
 	Query,
+	UseInterceptors,
+	UploadedFile,
 } from "@nestjs/common";
 import { UsersService } from "./users.service";
 import {
@@ -31,6 +33,7 @@ import { RoleGuard } from "@/shared/guards/roles.guard";
 import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { UpdateUserDto } from "./dto/create-user.dto";
 
 @ApiTags("Users")
@@ -71,6 +74,7 @@ export class UsersController {
 	): Promise<PaginationResult<UserResponseDto>> {
 		const page = pagination.page ?? 1;
 		const limit = pagination.limit ?? 10;
+
 		const search = pagination.search;
 		const role = pagination.role;
 
@@ -187,6 +191,7 @@ export class UsersController {
 
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({ summary: "Create a new user" })
 	@ApiResponse({
 		status: 201,
@@ -194,9 +199,11 @@ export class UsersController {
 		type: UserResponseDto,
 	})
 	async createUser(
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() createUserDto: CreateUserDto,
 		@Req() req: AuthRequest,
 	): Promise<{ message: string }> {
+		console.log(avatar);
 		const { role: currentUserRole } = req.user;
 
 		// Validate role permissions
@@ -223,8 +230,7 @@ export class UsersController {
 			lastName: createUserDto.lastName,
 			email: createUserDto.email,
 			role: createUserDto.role,
-			avatar: createUserDto.avatar,
-		});
+		}, avatar);
 
 		return {
 			message: "User created successfully",
@@ -232,6 +238,7 @@ export class UsersController {
 	}
 
 	@Put("profile")
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({
 		summary: "Update user profile",
 		description: "Update the current user profile information.",
@@ -242,17 +249,16 @@ export class UsersController {
 		type: UserResponseDto,
 	})
 	async updateUserProfile(
+		@UploadedFile() avatar: Express.Multer.File,
 		@Req() req: AuthRequest,
-		@Body() updateUserDto: UpdateUserDto,
+		@Body() updateUserDto: Partial<CreateUserDto>,
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const { id } = req.user;
 
-		const user = await this.usersService.update(id, updateUserDto);
-
-		if (!user)
-			throw new NotFoundException(
-				"User not found. Please check and try again later.",
-			);
+		const user = await this.usersService.update(id, {
+			firstName: updateUserDto.firstName,
+			lastName: updateUserDto.lastName,
+		}, avatar);
 
 		return {
 			message: "User profile updated successfully",

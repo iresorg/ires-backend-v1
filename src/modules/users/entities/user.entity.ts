@@ -31,6 +31,9 @@ export class User extends BaseEntity {
 	@Column({ type: "varchar", nullable: true, name: "last_login" })
 	lastLogin: Date;
 
-	@Column({ nullable: true, type: "varchar" })
-	avatar: string;
+	@Column({ nullable: true, type: "jsonb" })
+	avatar: {
+		publicId: string;
+		url: string;
+	};
 }

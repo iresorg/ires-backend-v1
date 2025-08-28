@@ -8,6 +8,8 @@ import {
 	Patch,
 	UseGuards,
 	Query,
+	UseInterceptors,
+	UploadedFiles,
 } from "@nestjs/common";
 import { TicketsService } from "./service";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
@@ -34,6 +36,7 @@ import { RoleGuard } from "@/shared/guards/roles.guard";
 import { GetTicketDto } from "./dto/get-ticket.dto";
 import { PaginatedResponse } from "@/shared/utils/pagination";
 import { PaginationQuery } from "@/shared/dto/pagination.dto";
+import { FilesInterceptor } from "@nestjs/platform-express";
 
 @UseGuards(AuthGuard)
 @Controller("tickets")
@@ -41,16 +44,19 @@ export class TicketsController {
 	constructor(private readonly ticketsService: TicketsService) {}
 
 	@ApiOperation({ summary: "Create a new ticket" })
+	@UseInterceptors(FilesInterceptor("attachments"))
 	@ApiResponse({ status: 201, description: "Ticket created successfully" })
 	@Post()
 	async createTicket(
+		@UploadedFiles() attachments: Express.Multer.File[],
 		@Body() createTicketDto: CreateTicketDto,
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
 		const data = await this.ticketsService.createTicket({
 			...createTicketDto,
 			createdById: req.user.id,
-		});
+		}, attachments);
+
 		return {
 			message: "Ticket created successfully",
 			data,

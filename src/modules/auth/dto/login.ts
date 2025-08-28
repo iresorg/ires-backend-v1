@@ -25,7 +25,7 @@ export class LoginResponseDto {
 		lastName: string;
 		email: string;
 		role: string;
-		avatar?: string;
+		avatar?: { publicId: string; url: string };
 		status?: string;
 	};
 }

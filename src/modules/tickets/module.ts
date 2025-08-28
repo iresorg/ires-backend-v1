@@ -9,6 +9,7 @@ import { UsersModule } from "@/modules/users/users.module";
 import { EmailModule } from "@/shared/email/module";
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { DatabaseModule } from "@/shared/database/datasource";
+import { FileUploadModule } from "../file-upload/module";
 
 @Module({
 	imports: [
@@ -16,6 +17,7 @@ import { DatabaseModule } from "@/shared/database/datasource";
 		UsersModule,
 		EmailModule,
 		DatabaseModule,
+		FileUploadModule,
 	],
 	providers: [TicketsService, TicketsRepository, TicketLifecycleRepository],
 	controllers: [TicketsController],

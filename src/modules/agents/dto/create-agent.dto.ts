@@ -17,7 +17,7 @@ export class CreateAgentDto {
 		{ require_protocol: true },
 		{ message: "Avatar must be a valid URL with protocol (http/https)" },
 	)
-	avatar?: string;
+	avatar?: { publicId: string; url: string };
 
 	// role is optional, always set to AGENT in service
 	role?: Role;
