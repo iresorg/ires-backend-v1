@@ -13,10 +13,6 @@ export class CreateAgentDto {
 	email: string;
 
 	@IsOptional()
-	@IsUrl(
-		{ require_protocol: true },
-		{ message: "Avatar must be a valid URL with protocol (http/https)" },
-	)
 	avatar?: { publicId: string; url: string };
 
 	// role is optional, always set to AGENT in service

@@ -12,6 +12,8 @@ import {
 	Delete,
 	Patch,
 	NotFoundException,
+	UseInterceptors,
+	UploadedFile,
 } from "@nestjs/common";
 import {
 	ApiTags,
@@ -31,6 +33,7 @@ import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
 import { UserResponseDto } from "../users/dto/user-response.dto";
+import { FileInterceptor } from "@nestjs/platform-express";
 
 @ApiTags("Agents")
 @ApiBearerAuth()
@@ -41,6 +44,7 @@ export class AgentsController {
 
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({
 		summary: "Create a new agent",
 		description:
@@ -64,6 +68,7 @@ export class AgentsController {
 		description: "Forbidden - Can only create agents",
 	})
 	async createAgent(
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() createAgentDto: CreateAgentDto,
 	): Promise<{ message: string }> {
 		// Only allow creation of AGENT role
@@ -73,7 +78,7 @@ export class AgentsController {
 		await this.agentsService.createAgent({
 			...createAgentDto,
 			role: Role.AGENT,
-		});
+		}, avatar);
 		return { message: "Agent created successfully" };
 	}
 
@@ -187,6 +192,7 @@ export class AgentsController {
 
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({
 		summary: "Update agent",
 		description:
@@ -221,6 +227,7 @@ export class AgentsController {
 	})
 	async updateAgent(
 		@Param("id") id: string,
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() updateAgentDto: Partial<CreateAgentDto>,
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const existingAgent = await this.agentsService.findAgentById(id);
@@ -234,7 +241,7 @@ export class AgentsController {
 			throw new ForbiddenException("Agents can only have AGENT role");
 		}
 
-		const agent = await this.agentsService.updateAgent(id, updateAgentDto);
+		const agent = await this.agentsService.updateAgent(id, updateAgentDto, avatar);
 
 		return {
 			message: "Agent updated successfully",

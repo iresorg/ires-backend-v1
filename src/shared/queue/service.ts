@@ -127,18 +127,34 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	async sendToQueue(queueName: string, message: unknown) {
-		this.isEventBusInitialized();
+		try {
+			this.isEventBusInitialized();
 
-		await this.channel.assertQueue(queueName, {
-			durable: true,
-		});
+			await this.channel.assertQueue(queueName, {
+				durable: true,
+			});
 
-		return this.channel.sendToQueue(
-			queueName,
-			Buffer.from(JSON.stringify(message)),
-			{
-				persistent: true,
-			},
-		);
+			return this.channel.sendToQueue(
+				queueName,
+				Buffer.from(JSON.stringify(message)),
+				{
+					persistent: true,
+				},
+			);
+		} catch (error) {
+			this.logger.error("Failed to send message to queue - RabbitMQ may not be running", {
+				queueName,
+				error: error as Error,
+				message: "Consider starting RabbitMQ or disabling email queue functionality"
+			});
+
+			// Don't throw error in development to prevent API failures
+			if (this.configService.get("NODE_ENV") === "development") {
+				this.logger.warn("Queue operation failed but continuing in development mode");
+				return false;
+			}
+
+			throw error;
+		}
 	}
 }

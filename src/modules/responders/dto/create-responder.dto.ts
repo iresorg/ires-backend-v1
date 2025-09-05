@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsUrl, IsOptional } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsEnum } from "class-validator";
 import { Role } from "../../users/enums/role.enum";
 import { PartialType } from "@nestjs/swagger";
 
@@ -13,12 +13,9 @@ export class CreateResponderDto {
 	email: string;
 
 	@IsOptional()
-	@IsUrl(
-		{ require_protocol: true },
-		{ message: "Avatar must be a valid URL with protocol (http/https)" },
-	)
 	avatar?: { publicId: string; url: string };
 
+	@IsEnum(Role)
 	role: Role; // Must be RESPONDER_TIER_1 or RESPONDER_TIER_2
 }
 

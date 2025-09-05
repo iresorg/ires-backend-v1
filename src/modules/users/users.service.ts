@@ -122,26 +122,31 @@ export class UsersService {
 	async update(
 		id: string,
 		updateUserDto: Partial<IUserUpdate>,
-		avatar?: Express.Multer.File
+		avatar?: Express.Multer.File,
+		requestingUserRole?: Role,
 	): Promise<IUser | null> {
 		const user = await this.usersRepository.findById(id);
 		if (!user) throw new NotFoundException("User not found.");
 
 		if (avatar) {
-			const response = await this.fileUpload.uploadImage(avatar, user.avatar?.publicId);
+			const response = await this.fileUpload.uploadImage(
+				avatar,
+				user.avatar?.publicId,
+			);
 			updateUserDto.avatar = {
 				publicId: response.public_id,
 				url: response.secure_url,
-			}
+			};
 		}
 		// Restrict role update to admins only and prevent updating to SUPER_ADMIN
 		if (
 			updateUserDto.role &&
+			requestingUserRole &&
 			![
 				Role.SUPER_ADMIN,
 				Role.AGENT_ADMIN,
 				Role.RESPONDER_ADMIN,
-			].includes(user.role)
+			].includes(requestingUserRole)
 		) {
 			throw new ForbiddenException("Only admins can update user roles.");
 		}
@@ -153,12 +158,15 @@ export class UsersService {
 
 		const updatedUser = await this.usersRepository.update(
 			id,
-			updateUserDto
+			updateUserDto,
 		);
 		return updatedUser;
 	}
 
-	async create(createUserDto: Omit<IUserCreate, "password">, avatar?: Express.Multer.File): Promise<IUser> {
+	async create(
+		createUserDto: Omit<IUserCreate, "password">,
+		avatar?: Express.Multer.File,
+	): Promise<IUser> {
 		try {
 			const password = this.utils.generatePassword(8);
 
@@ -167,7 +175,7 @@ export class UsersService {
 				createUserDto.avatar = {
 					publicId: response.public_id,
 					url: response.secure_url,
-				}
+				};
 			}
 
 			const user = await this.usersRepository.create({
@@ -176,7 +184,7 @@ export class UsersService {
 				email: createUserDto.email,
 				role: createUserDto.role,
 				password: await this.utils.createHash(password),
-				avatar: createUserDto.avatar
+				avatar: createUserDto.avatar,
 			});
 
 			await this.emailService.sendWelcomeEmail(

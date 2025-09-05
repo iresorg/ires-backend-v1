@@ -12,6 +12,8 @@ import {
 	Delete,
 	Patch,
 	NotFoundException,
+	UseInterceptors,
+	UploadedFile,
 } from "@nestjs/common";
 import {
 	ApiTags,
@@ -31,6 +33,7 @@ import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
 import { PaginationResult } from "@/shared/types/pagination-result.type";
 import { UserResponseDto } from "../users/dto/user-response.dto";
+import { FileInterceptor } from "@nestjs/platform-express";
 
 @ApiTags("Responders")
 @ApiBearerAuth()
@@ -41,6 +44,7 @@ export class RespondersController {
 
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.RESPONDER_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({
 		summary: "Create a new responder",
 		description:
@@ -64,6 +68,7 @@ export class RespondersController {
 		description: "Forbidden - Can only create responders",
 	})
 	async createResponder(
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() createResponderDto: CreateResponderDto,
 	): Promise<{ message: string }> {
 		// Only allow creation of RESPONDER roles
@@ -78,7 +83,7 @@ export class RespondersController {
 		await this.respondersService.createResponder({
 			...createResponderDto,
 			role: createResponderDto.role,
-		});
+		}, avatar);
 		return { message: "Responder created successfully" };
 	}
 
@@ -191,6 +196,7 @@ export class RespondersController {
 
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.RESPONDER_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({
 		summary: "Update responder",
 		description:
@@ -225,6 +231,7 @@ export class RespondersController {
 	})
 	async updateResponder(
 		@Param("id") id: string,
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() updateResponderDto: Partial<CreateResponderDto>,
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const existingResponder =
@@ -249,6 +256,7 @@ export class RespondersController {
 		const responder = await this.respondersService.updateResponder(
 			id,
 			updateResponderDto,
+			avatar,
 		);
 
 		return {

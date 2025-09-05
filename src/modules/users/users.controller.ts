@@ -225,12 +225,15 @@ export class UsersController {
 			);
 		}
 
-		await this.usersService.create({
-			firstName: createUserDto.firstName,
-			lastName: createUserDto.lastName,
-			email: createUserDto.email,
-			role: createUserDto.role,
-		}, avatar);
+		await this.usersService.create(
+			{
+				firstName: createUserDto.firstName,
+				lastName: createUserDto.lastName,
+				email: createUserDto.email,
+				role: createUserDto.role,
+			},
+			avatar,
+		);
 
 		return {
 			message: "User created successfully",
@@ -255,10 +258,14 @@ export class UsersController {
 	): Promise<{ message: string; data: UserResponseDto }> {
 		const { id } = req.user;
 
-		const user = await this.usersService.update(id, {
-			firstName: updateUserDto.firstName,
-			lastName: updateUserDto.lastName,
-		}, avatar);
+		const user = await this.usersService.update(
+			id,
+			{
+				firstName: updateUserDto.firstName,
+				lastName: updateUserDto.lastName,
+			},
+			avatar,
+		);
 
 		return {
 			message: "User profile updated successfully",
@@ -268,6 +275,7 @@ export class UsersController {
 
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
+	@UseInterceptors(FileInterceptor("avatar"))
 	@ApiOperation({ summary: "Update user" })
 	@ApiResponse({
 		status: 200,
@@ -276,6 +284,7 @@ export class UsersController {
 	})
 	async updateUser(
 		@Param("id") id: string,
+		@UploadedFile() avatar: Express.Multer.File,
 		@Body() updateUserDto: UpdateUserDto,
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: UserResponseDto }> {
@@ -328,7 +337,12 @@ export class UsersController {
 			);
 		}
 
-		const user = await this.usersService.update(id, updateUserDto);
+		const user = await this.usersService.update(
+			id,
+			updateUserDto,
+			avatar,
+			currentUserRole,
+		);
 		const data = UserResponseDto.fromUser(user);
 
 		return {

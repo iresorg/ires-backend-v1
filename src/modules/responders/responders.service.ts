@@ -7,7 +7,7 @@ import { IUserCreate, IUserUpdate } from "../users/interfaces/user.interface";
 export class RespondersService {
 	constructor(private readonly usersService: UsersService) {}
 
-	async createResponder(createResponderDto: Omit<IUserCreate, "password">) {
+	async createResponder(createResponderDto: Omit<IUserCreate, "password">, avatar?: Express.Multer.File) {
 		// Only allow RESPONDER_TIER_1 or RESPONDER_TIER_2
 		if (
 			![Role.RESPONDER_TIER_1, Role.RESPONDER_TIER_2].includes(
@@ -19,7 +19,7 @@ export class RespondersService {
 		return this.usersService.create({
 			...createResponderDto,
 			role: createResponderDto.role,
-		});
+		}, avatar);
 	}
 
 	async findAllResponders() {
@@ -64,6 +64,7 @@ export class RespondersService {
 	async updateResponder(
 		id: string,
 		updateResponderDto: Partial<IUserUpdate>,
+		avatar?: Express.Multer.File,
 	) {
 		const existingResponder = await this.findResponderById(id);
 		if (!existingResponder) {
@@ -80,7 +81,7 @@ export class RespondersService {
 			throw new Error("Invalid responder role");
 		}
 
-		return this.usersService.update(id, updateResponderDto);
+		return this.usersService.update(id, updateResponderDto, avatar);
 	}
 
 	async deleteResponder(id: string) {

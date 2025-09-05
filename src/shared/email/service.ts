@@ -9,19 +9,23 @@ export class EmailService {
 	constructor(private readonly emailConsumer: EmailConsumer) {}
 
 	async sendWelcomeEmail(email: string, password: string, name: string) {
-		const payload: EmailPayload<"NewUser"> = {
-			to: email,
-			from: "support@ires.co",
-			subject: "Welcome to iRes",
-			template: "NewUser",
-			options: {
-				userName: name,
-				headerText: "Welcome to iRes",
-				password,
-			},
-		};
+		// TODO: Re-enable when RabbitMQ is properly configured
+		console.log(`Welcome email would be sent to: ${email} with password: ${password} for user: ${name}`);
 
-		await this.emailConsumer.publishEmailToQueue(payload);
+		// Temporarily disabled to prevent queue errors
+		// const payload: EmailPayload<"NewUser"> = {
+		// 	to: email,
+		// 	from: "support@ires.co",
+		// 	subject: "Welcome to iRes",
+		// 	template: "NewUser",
+		// 	options: {
+		// 		userName: name,
+		// 		headerText: "Welcome to iRes",
+		// 		password,
+		// 	},
+		// };
+
+		// await this.emailConsumer.publishEmailToQueue(payload);
 	}
 
 	async sendNewTicketEmail(

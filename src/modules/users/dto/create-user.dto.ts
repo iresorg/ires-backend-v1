@@ -37,13 +37,8 @@ export class CreateUserDto {
 	@IsEmail()
 	email: string;
 
-	@ApiProperty({ description: "User avatar URL", required: false })
+	@ApiProperty({ description: "User avatar object with publicId and url", required: false })
 	@IsOptional()
-	@IsString()
-	@IsUrl(
-		{ require_protocol: true },
-		{ message: "Avatar must be a valid URL with protocol (http/https)" },
-	)
 	avatar?: { publicId: string; url: string };
 
 	@ApiProperty({ description: "User role", enum: Role, required: false })
