@@ -8,12 +8,18 @@ import { CreateAgentDto } from "./dto/create-agent.dto";
 export class AgentsService {
 	constructor(private readonly usersService: UsersService) {}
 
-	async createAgent(createAgentDto: Omit<IUserCreate, "password">, avatar?: Express.Multer.File) {
+	async createAgent(
+		createAgentDto: Omit<IUserCreate, "password">,
+		avatar?: Express.Multer.File,
+	) {
 		// Reuse user creation logic, always set role to AGENT
-		return this.usersService.create({
-			...createAgentDto,
-			role: Role.AGENT,
-		}, avatar);
+		return this.usersService.create(
+			{
+				...createAgentDto,
+				role: Role.AGENT,
+			},
+			avatar,
+		);
 	}
 
 	async findAgentsPaginated(limit: number, offset: number) {
@@ -43,7 +49,11 @@ export class AgentsService {
 		return user && user.role === Role.AGENT ? user : null;
 	}
 
-	async updateAgent(id: string, updateAgentDto: Partial<CreateAgentDto>, avatar?: Express.Multer.File) {
+	async updateAgent(
+		id: string,
+		updateAgentDto: Partial<CreateAgentDto>,
+		avatar?: Express.Multer.File,
+	) {
 		// Update agent - ensure role remains AGENT
 		const updateData = {
 			...updateAgentDto,

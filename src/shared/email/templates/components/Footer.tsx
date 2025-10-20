@@ -13,7 +13,10 @@ export default () => (
 
     <Row className="my-0">
       <Text className="text-gray-500 text-xs text-center mt-1.5 mb-0">
-        Email: <Link href="mailto:support@ires.co">support@ires.co</Link>
+        Email:{" "}
+        <Link href="mailto:techsupport@iresorg.com">
+          techsupport@iresorg.com
+        </Link>
       </Text>
     </Row>
 

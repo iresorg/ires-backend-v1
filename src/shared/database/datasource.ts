@@ -10,6 +10,11 @@ import { Tickets } from "@/modules/tickets/entities/ticket.entity";
 import { TicketLifecycle } from "@/modules/tickets/entities/ticket-lifecycle.entity";
 import { TicketCategory } from "@/modules/ticket-categories/entities/ticket-category.entity";
 import { TicketSubCategory } from "@/modules/ticket-categories/entities/ticket-sub-category.entity";
+import { Account } from "@/modules/accounts/entities/account.entity";
+import { IndividualProfile } from "@/modules/accounts/entities/individual-profile.entity";
+import { OrganizationProfile } from "@/modules/accounts/entities/organization-profile.entity";
+import { AccountEmailVerification } from "@/modules/accounts/entities/email-verification.entity";
+import { AccountPasswordReset } from "@/modules/accounts/entities/password-reset.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -29,6 +34,11 @@ export function createDataSourceOptions(
 			TicketLifecycle,
 			TicketCategory,
 			TicketSubCategory,
+			Account,
+			IndividualProfile,
+			OrganizationProfile,
+			AccountEmailVerification,
+			AccountPasswordReset,
 		],
 		migrations: ["src/shared/database/migrations/*.ts"],
 		migrationsTableName: "migrations",

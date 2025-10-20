@@ -8,24 +8,24 @@ import { TicketEscalateParams } from "./templates/TicketEscalated";
 export class EmailService {
 	constructor(private readonly emailConsumer: EmailConsumer) {}
 
-	async sendWelcomeEmail(email: string, password: string, name: string) {
-		// TODO: Re-enable when RabbitMQ is properly configured
-		console.log(`Welcome email would be sent to: ${email} with password: ${password} for user: ${name}`);
+	async sendWelcomeEmail(
+		email: string,
+		password: string,
+		name: string,
+	): Promise<void> {
+		const payload: EmailPayload<"NewUser"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Welcome to iRes - Your Account Details",
+			template: "NewUser",
+			options: {
+				userName: name,
+				headerText: "Welcome to iRes",
+				password,
+			},
+		};
 
-		// Temporarily disabled to prevent queue errors
-		// const payload: EmailPayload<"NewUser"> = {
-		// 	to: email,
-		// 	from: "support@ires.co",
-		// 	subject: "Welcome to iRes",
-		// 	template: "NewUser",
-		// 	options: {
-		// 		userName: name,
-		// 		headerText: "Welcome to iRes",
-		// 		password,
-		// 	},
-		// };
-
-		// await this.emailConsumer.publishEmailToQueue(payload);
+		await this.emailConsumer.publishEmailToQueue(payload);
 	}
 
 	async sendNewTicketEmail(
@@ -42,7 +42,7 @@ export class EmailService {
 	) {
 		const payload: EmailPayload<"NewTicket"> = {
 			to: email,
-			from: "support@ires.co",
+			from: "techsupport@iresorg.com",
 			subject: "Action Required - New Ticket Submitted",
 			template: "NewTicket",
 			options: {
@@ -68,7 +68,7 @@ export class EmailService {
 
 		const payload: EmailPayload<"TicketEscalated"> = {
 			to: email,
-			from: "support@ires.co",
+			from: "techsupport@iresorg.com",
 			subject: "Ticket Escalated: Action Required",
 			template: "TicketEscalated",
 			options: {
@@ -78,6 +78,51 @@ export class EmailService {
 				ticketId,
 				subject,
 				escalationReason,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendAccountVerificationEmail(email: string, otp: string) {
+		const payload: EmailPayload<"VerifyEmail"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Verify your email",
+			template: "VerifyEmail",
+			options: { headerText: "Verify your email", otp },
+		};
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendPasswordResetEmail(email: string, resetToken: string) {
+		const payload: EmailPayload<"PasswordReset"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Reset your password",
+			template: "PasswordReset",
+			options: {
+				headerText: "Reset your password",
+				resetToken,
+			},
+		};
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendAccountWelcomeEmail(
+		email: string,
+		userName: string,
+		accountType: "individual" | "organization",
+	): Promise<void> {
+		const payload: EmailPayload<"AccountWelcome"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Welcome to iRes - Your Account is Ready!",
+			template: "AccountWelcome",
+			options: {
+				headerText: "Welcome to iRes",
+				userName,
+				accountType,
 			},
 		};
 

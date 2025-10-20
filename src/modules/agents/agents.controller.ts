@@ -75,10 +75,13 @@ export class AgentsController {
 		if (createAgentDto.role && createAgentDto.role !== Role.AGENT) {
 			throw new ForbiddenException("Can only create agents");
 		}
-		await this.agentsService.createAgent({
-			...createAgentDto,
-			role: Role.AGENT,
-		}, avatar);
+		await this.agentsService.createAgent(
+			{
+				...createAgentDto,
+				role: Role.AGENT,
+			},
+			avatar,
+		);
 		return { message: "Agent created successfully" };
 	}
 
@@ -241,7 +244,11 @@ export class AgentsController {
 			throw new ForbiddenException("Agents can only have AGENT role");
 		}
 
-		const agent = await this.agentsService.updateAgent(id, updateAgentDto, avatar);
+		const agent = await this.agentsService.updateAgent(
+			id,
+			updateAgentDto,
+			avatar,
+		);
 
 		return {
 			message: "Agent updated successfully",

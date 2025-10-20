@@ -19,6 +19,7 @@ import { TicketCategoriesModule } from "./modules/ticket-categories/ticket-categ
 import { AgentsModule } from "./modules/agents/agents.module";
 import { RespondersModule } from "./modules/responders/responders.module";
 import { FileUploadModule } from "./modules/file-upload/module";
+import { AccountsModule } from "./modules/accounts/accounts.module";
 
 @Module({
 	imports: [
@@ -35,6 +36,7 @@ import { FileUploadModule } from "./modules/file-upload/module";
 		LoggerModule,
 		EmailModule,
 		QueueModule,
+		AccountsModule,
 		TicketsModule,
 		TicketCategoriesModule,
 		AgentsModule,

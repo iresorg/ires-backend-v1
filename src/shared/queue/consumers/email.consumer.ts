@@ -12,11 +12,17 @@ import NewTicket from "@/shared/email/templates/NewTicket";
 import { EmailComponent, EmailPayload } from "@/shared/email/types";
 import { Logger } from "@/shared/logger/service";
 import TicketEscalated from "@/shared/email/templates/TicketEscalated";
+import VerifyEmail from "@/shared/email/templates/VerifyEmail";
+import PasswordReset from "@/shared/email/templates/PasswordReset";
+import AccountWelcome from "@/shared/email/templates/AccountWelcome";
 
 export const templates = {
 	NewUser,
 	NewTicket,
 	TicketEscalated,
+	VerifyEmail,
+	PasswordReset,
+	AccountWelcome,
 };
 
 @Injectable()
