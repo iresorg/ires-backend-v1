@@ -128,4 +128,84 @@ export class EmailService {
 
 		await this.emailConsumer.publishEmailToQueue(payload);
 	}
+
+	async sendSubscriptionActivatedEmail(
+		email: string,
+		userName: string,
+		planName: string,
+		billingDate: string,
+	): Promise<void> {
+		const payload: EmailPayload<"SubscriptionActivated"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Subscription Activated - Welcome!",
+			template: "SubscriptionActivated",
+			options: {
+				userName,
+				planName,
+				billingDate,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendSubscriptionCancelledEmail(
+		email: string,
+		userName: string,
+		planName: string,
+		endDate: string,
+	): Promise<void> {
+		const payload: EmailPayload<"SubscriptionCancelled"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Subscription Cancelled",
+			template: "SubscriptionCancelled",
+			options: {
+				userName,
+				planName,
+				endDate,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendPaymentFailedEmail(
+		email: string,
+		userName: string,
+		planName: string,
+	): Promise<void> {
+		const payload: EmailPayload<"PaymentFailed"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Payment Failed - Action Required",
+			template: "PaymentFailed",
+			options: {
+				userName,
+				planName,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendSubscriptionEndedEmail(
+		email: string,
+		userName: string,
+		planName: string,
+	): Promise<void> {
+		const payload: EmailPayload<"SubscriptionEnded"> = {
+			to: [email],
+			from: "techsupport@iresorg.com",
+			subject: "Subscription Expired",
+			template: "SubscriptionEnded",
+			options: {
+				userName,
+				planName,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
 }

@@ -20,6 +20,7 @@ import { AgentsModule } from "./modules/agents/agents.module";
 import { RespondersModule } from "./modules/responders/responders.module";
 import { FileUploadModule } from "./modules/file-upload/module";
 import { AccountsModule } from "./modules/accounts/accounts.module";
+import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 
 @Module({
 	imports: [
@@ -37,6 +38,7 @@ import { AccountsModule } from "./modules/accounts/accounts.module";
 		EmailModule,
 		QueueModule,
 		AccountsModule,
+		SubscriptionsModule,
 		TicketsModule,
 		TicketCategoriesModule,
 		AgentsModule,

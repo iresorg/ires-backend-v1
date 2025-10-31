@@ -28,6 +28,6 @@ import { FileUploadModule } from "../file-upload/module";
 	],
 	controllers: [AccountsAuthController],
 	providers: [AccountsRepository, AccountsService, AccountsAuthGuard],
-	exports: [AccountsService],
+	exports: [AccountsService, AccountsRepository],
 })
 export class AccountsModule {}

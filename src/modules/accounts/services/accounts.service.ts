@@ -13,6 +13,9 @@ import { RegisterOrganizationDto } from "../dto/register-organization.dto";
 import { LoginDto } from "../dto/login.dto";
 import { ForgotPasswordDto } from "../dto/forgot-password.dto";
 import { ResetPasswordDto } from "../dto/reset-password.dto";
+import { UpdateIndividualProfileDto } from "../dto/update-individual-profile.dto";
+import { UpdateOrganizationProfileDto } from "../dto/update-organization-profile.dto";
+import { ChangePasswordDto } from "../dto/change-password.dto";
 
 @Injectable()
 export class AccountsService {
@@ -300,5 +303,116 @@ export class AccountsService {
 		await this.repo.markPasswordResetUsed(resetRecord.id);
 
 		return { message: "Password has been reset successfully" };
+	}
+
+	async updateIndividualProfile(
+		accountId: string,
+		dto: UpdateIndividualProfileDto,
+		profilePicture?: Express.Multer.File,
+	) {
+		const account = await this.repo.findById(accountId);
+		if (!account) {
+			throw new BadRequestException("Account not found");
+		}
+
+		if (account.role !== "individual") {
+			throw new BadRequestException("Account is not an individual");
+		}
+
+		const updateData: any = {};
+
+		if (dto.firstName) updateData.firstName = dto.firstName;
+		if (dto.lastName) updateData.lastName = dto.lastName;
+		if (dto.phoneNumber) updateData.phoneNumber = dto.phoneNumber;
+
+		if (profilePicture) {
+			// Upload new profile picture
+			const response = await this.fileUpload.uploadImage(profilePicture);
+			updateData.profilePicture = {
+				publicId: response.public_id,
+				url: response.secure_url,
+			};
+		}
+
+		await this.repo.updateIndividualProfile(accountId, updateData);
+
+		return { message: "Profile updated successfully" };
+	}
+
+	async updateOrganizationProfile(
+		accountId: string,
+		dto: UpdateOrganizationProfileDto,
+		logoFile?: Express.Multer.File,
+	) {
+		const account = await this.repo.findById(accountId);
+		if (!account) {
+			throw new BadRequestException("Account not found");
+		}
+
+		if (account.role !== "organization") {
+			throw new BadRequestException("Account is not an organization");
+		}
+
+		const updateData: any = {};
+
+		if (dto.organizationName)
+			updateData.organizationName = dto.organizationName;
+		if (dto.industryType) updateData.industryType = dto.industryType;
+		if (dto.companySize) updateData.companySize = dto.companySize;
+		if (dto.businessAddress)
+			updateData.businessAddress = dto.businessAddress;
+		if (dto.city) updateData.city = dto.city;
+		if (dto.state) updateData.state = dto.state;
+		if (dto.country) updateData.country = dto.country;
+		if (dto.phoneNumber) updateData.phoneNumber = dto.phoneNumber;
+		if (dto.primaryContactFirstName)
+			updateData.primaryContactFirstName = dto.primaryContactFirstName;
+		if (dto.primaryContactLastName)
+			updateData.primaryContactLastName = dto.primaryContactLastName;
+		if (dto.primaryContactJobTitle)
+			updateData.primaryContactJobTitle = dto.primaryContactJobTitle;
+		if (dto.primaryContactEmail)
+			updateData.primaryContactEmail = dto.primaryContactEmail;
+		if (dto.primaryContactPhoneNumber)
+			updateData.primaryContactPhoneNumber =
+				dto.primaryContactPhoneNumber;
+
+		if (logoFile) {
+			// Upload new logo
+			const response = await this.fileUpload.uploadImage(logoFile);
+			updateData.logoUrl = {
+				publicId: response.public_id,
+				url: response.secure_url,
+			};
+		}
+
+		await this.repo.updateOrganizationProfile(accountId, updateData);
+
+		return { message: "Profile updated successfully" };
+	}
+
+	async changePassword(accountId: string, dto: ChangePasswordDto) {
+		const account = await this.repo.findById(accountId);
+		if (!account) {
+			throw new BadRequestException("Account not found");
+		}
+
+		const ok = await this.utils.ensureHashMatchesText(
+			account.passwordHash,
+			dto.currentPassword,
+		);
+		if (!ok) {
+			throw new UnauthorizedException("Current password is incorrect");
+		}
+
+		const passwordHash = await this.utils.createHash(dto.newPassword);
+		await this.repo.updatePassword(accountId, passwordHash);
+
+		return { message: "Password changed successfully" };
+	}
+
+	logout() {
+		// Logout is stateless with JWT, just return success
+		return { message: "Logged out successfully" };
 	}
 }

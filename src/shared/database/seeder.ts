@@ -2,9 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { User } from "@/modules/users/entities/user.entity";
 import { Role } from "@/modules/users/enums/role.enum";
+import { SubscriptionPlan } from "@/modules/subscriptions/entities/subscription-plan.entity";
 import * as bcrypt from "bcrypt";
 import { EnvVariables } from "@/utils/env.validate";
 import { AppDataSource, env } from "./datasource";
+import { SUBSCRIPTION_PLANS } from "./subscription-plans.data";
 
 @Injectable()
 export class Seeder {
@@ -18,6 +20,7 @@ export class Seeder {
 			await this.dataSource.initialize();
 		}
 		await this.seedSuperAdmin();
+		await this.seedSubscriptionPlans();
 
 		await this.dataSource.destroy();
 	}
@@ -43,6 +46,19 @@ export class Seeder {
 			role: Role.SUPER_ADMIN,
 		});
 		await userRepository.save(newSuperAdmin);
+	}
+
+	async seedSubscriptionPlans() {
+		const planRepository = this.dataSource.getRepository(SubscriptionPlan);
+		const existingPlans = await planRepository.find();
+		if (existingPlans.length > 0) {
+			return;
+		}
+
+		for (const planData of SUBSCRIPTION_PLANS) {
+			const plan = planRepository.create(planData);
+			await planRepository.save(plan);
+		}
 	}
 }
 

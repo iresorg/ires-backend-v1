@@ -93,4 +93,24 @@ export class AccountsRepository {
 	async updatePassword(accountId: string, passwordHash: string) {
 		await this.accounts.update({ id: accountId }, { passwordHash });
 	}
+
+	async updateIndividualProfile(
+		accountId: string,
+		data: Partial<IndividualProfile>,
+	) {
+		await this.individualProfiles.update(
+			{ account: { id: accountId } },
+			data,
+		);
+	}
+
+	async updateOrganizationProfile(
+		accountId: string,
+		data: Partial<OrganizationProfile>,
+	) {
+		await this.organizationProfiles.update(
+			{ account: { id: accountId } },
+			data,
+		);
+	}
 }

@@ -15,6 +15,10 @@ import TicketEscalated from "@/shared/email/templates/TicketEscalated";
 import VerifyEmail from "@/shared/email/templates/VerifyEmail";
 import PasswordReset from "@/shared/email/templates/PasswordReset";
 import AccountWelcome from "@/shared/email/templates/AccountWelcome";
+import SubscriptionActivated from "@/shared/email/templates/SubscriptionActivated";
+import SubscriptionCancelled from "@/shared/email/templates/SubscriptionCancelled";
+import PaymentFailed from "@/shared/email/templates/PaymentFailed";
+import SubscriptionEnded from "@/shared/email/templates/SubscriptionEnded";
 
 export const templates = {
 	NewUser,
@@ -23,6 +27,10 @@ export const templates = {
 	VerifyEmail,
 	PasswordReset,
 	AccountWelcome,
+	SubscriptionActivated,
+	SubscriptionCancelled,
+	PaymentFailed,
+	SubscriptionEnded,
 };
 
 @Injectable()

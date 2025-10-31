@@ -5,6 +5,7 @@ import {
 	HttpCode,
 	HttpStatus,
 	Post,
+	Put,
 	Req,
 	UseGuards,
 	UseInterceptors,
@@ -25,6 +26,9 @@ import { LoginDto } from "../dto/login.dto";
 import { ForgotPasswordDto } from "../dto/forgot-password.dto";
 import { ResetPasswordDto } from "../dto/reset-password.dto";
 import { VerifyEmailDto } from "../dto/verify-email.dto";
+import { UpdateIndividualProfileDto } from "../dto/update-individual-profile.dto";
+import { UpdateOrganizationProfileDto } from "../dto/update-organization-profile.dto";
+import { ChangePasswordDto } from "../dto/change-password.dto";
 import { Public } from "@/shared/decorators/public.decorator";
 import { AccountsAuthGuard } from "@/shared/guards/accounts-auth.guard";
 
@@ -393,5 +397,174 @@ export class AccountsAuthController {
 	})
 	async resetPassword(@Body() body: ResetPasswordDto) {
 		return await this.accountsService.resetPassword(body);
+	}
+
+	@UseGuards(AccountsAuthGuard)
+	@Put("profile")
+	@UseInterceptors(FileInterceptor("profilePicture"))
+	@ApiConsumes("multipart/form-data")
+	@ApiOperation({
+		summary: "Update user profile",
+		description:
+			"Update individual or organization profile. Only provide the fields you want to update.",
+	})
+	@ApiBody({
+		description: "Profile update data with optional profile picture/logo",
+		schema: {
+			type: "object",
+			properties: {
+				profilePicture: {
+					type: "string",
+					format: "binary",
+					description:
+						"Profile picture (for individuals) or logo (for organizations)",
+				},
+				// Individual fields
+				firstName: { type: "string", example: "John" },
+				lastName: { type: "string", example: "Doe" },
+				phoneNumber: { type: "string", example: "+1234567890" },
+				// Organization fields
+				organizationName: {
+					type: "string",
+					example: "Acme Corporation",
+				},
+				industryType: { type: "string", example: "Technology" },
+				companySize: { type: "string", example: "51-200" },
+				businessAddress: { type: "string", example: "123 Business St" },
+				city: { type: "string", example: "New York" },
+				state: { type: "string", example: "NY" },
+				country: { type: "string", example: "United States" },
+				primaryContactFirstName: { type: "string", example: "Jane" },
+				primaryContactLastName: { type: "string", example: "Smith" },
+				primaryContactJobTitle: {
+					type: "string",
+					example: "IT Manager",
+				},
+				primaryContactEmail: {
+					type: "string",
+					example: "jane@company.com",
+				},
+				primaryContactPhoneNumber: {
+					type: "string",
+					example: "+1234567890",
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Profile updated successfully",
+		schema: {
+			type: "object",
+			properties: {
+				message: {
+					type: "string",
+					example: "Profile updated successfully",
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 400,
+		description: "Invalid account type or validation error",
+	})
+	@ApiResponse({
+		status: 401,
+		description: "Unauthorized - Invalid or missing token",
+	})
+	async updateProfile(
+		@UploadedFile() file: Express.Multer.File,
+		@Body() body: any,
+		@Req() req: any,
+	) {
+		const account = await this.accountsService.getProfile(req.user.id);
+
+		if (account.role === "individual") {
+			return await this.accountsService.updateIndividualProfile(
+				req.user.id,
+				body as UpdateIndividualProfileDto,
+				file,
+			);
+		} else if (account.role === "organization") {
+			return await this.accountsService.updateOrganizationProfile(
+				req.user.id,
+				body as UpdateOrganizationProfileDto,
+				file,
+			);
+		} else {
+			throw new Error("Invalid account role");
+		}
+	}
+
+	@UseGuards(AccountsAuthGuard)
+	@Post("change-password")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: "Change password",
+		description:
+			"Change your account password by providing the current password and new password.",
+	})
+	@ApiBody({
+		description: "Password change data",
+		type: ChangePasswordDto,
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Password changed successfully",
+		schema: {
+			type: "object",
+			properties: {
+				message: {
+					type: "string",
+					example: "Password changed successfully",
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 401,
+		description: "Current password is incorrect",
+		schema: {
+			type: "object",
+			properties: {
+				message: {
+					type: "string",
+					example: "Current password is incorrect",
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 400,
+		description: "Validation error",
+	})
+	async changePassword(@Body() body: ChangePasswordDto, @Req() req: any) {
+		return await this.accountsService.changePassword(req.user.id, body);
+	}
+
+	@UseGuards(AccountsAuthGuard)
+	@Post("logout")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: "Logout",
+		description:
+			"Logout from the current session. Note: For JWT-based authentication, logout is handled client-side by discarding the token.",
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Logged out successfully",
+		schema: {
+			type: "object",
+			properties: {
+				message: { type: "string", example: "Logged out successfully" },
+			},
+		},
+	})
+	@ApiResponse({
+		status: 401,
+		description: "Unauthorized - Invalid or missing token",
+	})
+	logout() {
+		return this.accountsService.logout();
 	}
 }

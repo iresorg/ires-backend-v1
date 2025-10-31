@@ -15,6 +15,9 @@ import { IndividualProfile } from "@/modules/accounts/entities/individual-profil
 import { OrganizationProfile } from "@/modules/accounts/entities/organization-profile.entity";
 import { AccountEmailVerification } from "@/modules/accounts/entities/email-verification.entity";
 import { AccountPasswordReset } from "@/modules/accounts/entities/password-reset.entity";
+import { Subscription } from "@/modules/subscriptions/entities/subscription.entity";
+import { SubscriptionPlan } from "@/modules/subscriptions/entities/subscription-plan.entity";
+import { PaystackEvent } from "@/modules/subscriptions/entities/paystack-event.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -39,6 +42,10 @@ export function createDataSourceOptions(
 			OrganizationProfile,
 			AccountEmailVerification,
 			AccountPasswordReset,
+			// Subscriptions module entities
+			Subscription,
+			SubscriptionPlan,
+			PaystackEvent,
 		],
 		migrations: ["src/shared/database/migrations/*.ts"],
 		migrationsTableName: "migrations",

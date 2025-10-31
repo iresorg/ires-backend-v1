@@ -1,0 +1,121 @@
+export const SUBSCRIPTION_PLANS = [
+	// Individual Plans
+	{
+		name: "Essential Protection",
+		tier: 1,
+		accountType: "individual" as const,
+		amount: 15000000, // ₦15,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_zpdclk6rfprabvh",
+		description: "For everyday phone & social media users",
+		features: [
+			"Incident reporting via phone/email",
+			"Social media account recovery",
+			"Basic scam & fraud advisory",
+			"Personal data privacy checks",
+			"24–48 hrs response time",
+		],
+		maxIncidents: 1,
+		active: true,
+	},
+	{
+		name: "Advanced Security",
+		tier: 2,
+		accountType: "individual" as const,
+		amount: 30000000, // ₦30,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_n6ncggceegkbhbt",
+		description: "For freelancers, small-scale sellers, influencers",
+		features: [
+			"Priority incident handling",
+			"Malware & spyware removal",
+			"Payment fraud investigation",
+			"Social media & email breach recovery",
+			"Data loss prevention tips",
+			"12–24 hrs response time",
+		],
+		maxIncidents: 2,
+		active: true,
+	},
+	{
+		name: "Premium Defense",
+		tier: 3,
+		accountType: "individual" as const,
+		amount: 50000000, // ₦50,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_ki46lweo54uhej3",
+		description: "For high-risk individuals, public figures, executives",
+		features: [
+			"24/7 priority access",
+			"Advanced account monitoring",
+			"Comprehensive breach investigation",
+			"Device security optimization",
+			"Data recovery support",
+			"4–6 hrs response time",
+		],
+		maxIncidents: 4,
+		active: true,
+	},
+	// Organization Plans
+	{
+		name: "Business Shield",
+		tier: 1,
+		accountType: "organization" as const,
+		amount: 80000000, // ₦80,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_nt6nyw5q6e7ck85",
+		description: "For small businesses (1–10 staff)",
+		features: [
+			"Incident reporting hotline",
+			"Phishing & scam prevention",
+			"Basic ransomware & malware response",
+			"Website & email breach recovery",
+			"24–48 hrs response time",
+		],
+		maxIncidents: 2,
+		active: true,
+	},
+	{
+		name: "Enterprise Guard",
+		tier: 2,
+		accountType: "organization" as const,
+		amount: 250000000, // ₦250,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_eahyxv6lbjktbjq",
+		description: "For medium-sized businesses (11–50 staff)",
+		features: [
+			"Dedicated account manager",
+			"Network intrusion detection",
+			"Ransomware containment & removal",
+			"DDoS attack mitigation",
+			"Payment system compromise investigation",
+			"12–24 hrs response time",
+		],
+		maxIncidents: 5,
+		active: true,
+	},
+	{
+		name: "Corporate Fortress",
+		tier: 3,
+		accountType: "organization" as const,
+		amount: 500000000, // ₦500,000 in kobo
+		currency: "NGN",
+		interval: "monthly",
+		paystackPlanCode: "PLN_xosan7dk1d2vxnt",
+		description: "For large corporations & critical sectors",
+		features: [
+			"24/7 SOC (Security Operations Center) support",
+			"Onsite & remote incident response",
+			"Insider threat detection",
+			"Advanced threat hunting & forensics",
+			"SLA: under 4 hrs response time",
+		],
+		maxIncidents: null, // unlimited
+		active: true,
+	},
+];
