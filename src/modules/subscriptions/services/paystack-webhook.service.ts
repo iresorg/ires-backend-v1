@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PaystackService } from "./paystack.service";
 import { SubscriptionsRepository } from "../repository/subscriptions.repository";
+import { TransactionsRepository } from "../repository/transactions.repository";
+import { TransactionStatus } from "../entities/transaction.entity";
 import { EmailService } from "@/shared/email/service";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import {
@@ -19,6 +21,7 @@ export class PaystackWebhookService {
 	constructor(
 		private readonly paystack: PaystackService,
 		private readonly subscriptionsRepo: SubscriptionsRepository,
+		private readonly transactionsRepo: TransactionsRepository,
 		private readonly accountsRepo: AccountsRepository,
 		private readonly emailService: EmailService,
 		@InjectRepository(PaystackEvent)
@@ -98,11 +101,27 @@ export class PaystackWebhookService {
 	private async handleChargeSuccess(data: any) {
 		// Successful payment - extend subscription
 		const subscriptionCode = data.subscription?.subscription_code;
-		if (!subscriptionCode) return;
+		const transactionReference = data.reference;
 
-		const subscription =
-			await this.subscriptionsRepo.findByPaystackCode(subscriptionCode);
-		if (!subscription) return;
+		// Try to find subscription by subscription_code first (for renewals)
+		// If not found and we have a reference, try finding by transaction reference (for first payments)
+		let subscription = subscriptionCode
+			? await this.subscriptionsRepo.findByPaystackCode(subscriptionCode)
+			: null;
+
+		if (!subscription && transactionReference) {
+			subscription =
+				await this.subscriptionsRepo.findByTransactionReference(
+					transactionReference,
+				);
+		}
+
+		if (!subscription) {
+			this.logger.warn(
+				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}`,
+			);
+			return;
+		}
 
 		// Update billing dates
 		const now = new Date();
@@ -139,6 +158,36 @@ export class PaystackWebhookService {
 			updateData,
 		);
 
+		// Create or update transaction record for renewal
+		if (transactionReference) {
+			const existingTransaction =
+				await this.transactionsRepo.findByReference(
+					transactionReference,
+				);
+			if (!existingTransaction) {
+				await this.transactionsRepo.createTransaction({
+					accountId: subscription.accountId,
+					subscriptionId: subscription.id,
+					planId: subscription.planId,
+					transactionReference,
+					status: TransactionStatus.SUCCESS,
+					amount: data.amount || subscription.plan.amount,
+					currency: data.currency || subscription.plan.currency,
+					paymentMethod: "Paystack",
+					paystackCustomerCode: subscription.paystackCustomerCode,
+					metadata: {
+						paystackTransactionId: data.id,
+						isRenewal: true,
+					},
+				});
+			} else {
+				await this.transactionsRepo.updateTransactionStatus(
+					transactionReference,
+					TransactionStatus.SUCCESS,
+				);
+			}
+		}
+
 		this.logger.log(`Subscription ${subscription.id} renewed successfully`);
 	}
 
@@ -154,6 +203,38 @@ export class PaystackWebhookService {
 		await this.subscriptionsRepo.updateSubscription(subscription.id, {
 			status: SubscriptionStatus.PAST_DUE,
 		});
+
+		// Create or update transaction record for failed payment
+		const transactionReference = data.reference;
+		if (transactionReference) {
+			const existingTransaction =
+				await this.transactionsRepo.findByReference(
+					transactionReference,
+				);
+			if (!existingTransaction) {
+				await this.transactionsRepo.createTransaction({
+					accountId: subscription.accountId,
+					subscriptionId: subscription.id,
+					planId: subscription.planId,
+					transactionReference,
+					status: TransactionStatus.FAILED,
+					amount: data.amount || subscription.plan.amount,
+					currency: data.currency || subscription.plan.currency,
+					paymentMethod: "Paystack",
+					paystackCustomerCode: subscription.paystackCustomerCode,
+					metadata: {
+						paystackTransactionId: data.id,
+						failureReason:
+							data.gateway_response || "Payment failed",
+					},
+				});
+			} else {
+				await this.transactionsRepo.updateTransactionStatus(
+					transactionReference,
+					TransactionStatus.FAILED,
+				);
+			}
+		}
 
 		// Send payment failed email
 		const account = await this.accountsRepo.findById(

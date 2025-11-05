@@ -18,6 +18,7 @@ import { AccountPasswordReset } from "@/modules/accounts/entities/password-reset
 import { Subscription } from "@/modules/subscriptions/entities/subscription.entity";
 import { SubscriptionPlan } from "@/modules/subscriptions/entities/subscription-plan.entity";
 import { PaystackEvent } from "@/modules/subscriptions/entities/paystack-event.entity";
+import { SubscriptionTransaction } from "@/modules/subscriptions/entities/transaction.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -46,6 +47,7 @@ export function createDataSourceOptions(
 			Subscription,
 			SubscriptionPlan,
 			PaystackEvent,
+			SubscriptionTransaction,
 		],
 		migrations: ["src/shared/database/migrations/*.ts"],
 		migrationsTableName: "migrations",

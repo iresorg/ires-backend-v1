@@ -274,4 +274,68 @@ export class SubscriptionsController {
 	async resumeSubscription(@Req() req: any) {
 		return await this.subscriptionsService.resumeSubscription(req.user.id);
 	}
+
+	@UseGuards(AccountsAuthGuard)
+	@Get("transactions")
+	@ApiOperation({
+		summary: "Get transaction history",
+		description: "Get all payment transactions for the current user",
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Transaction history retrieved successfully",
+		schema: {
+			type: "object",
+			properties: {
+				data: {
+					type: "array",
+					items: {
+						type: "object",
+						properties: {
+							id: { type: "string" },
+							transactionReference: {
+								type: "string",
+								example: "tx_1234567890",
+							},
+							date: {
+								type: "string",
+								format: "date-time",
+							},
+							amount: { type: "number", example: 15000000 },
+							currency: { type: "string", example: "NGN" },
+							status: {
+								type: "string",
+								enum: ["success", "failed", "pending"],
+								example: "success",
+							},
+							plan: {
+								type: "object",
+								nullable: true,
+								properties: {
+									name: {
+										type: "string",
+										example: "Essential Protection",
+									},
+									tier: { type: "number", example: 1 },
+								},
+							},
+							paymentMethod: {
+								type: "string",
+								example: "Paystack",
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 401,
+		description: "Unauthorized - Invalid or missing token",
+	})
+	async getTransactionHistory(@Req() req: any) {
+		const transactions =
+			await this.subscriptionsService.getTransactionHistory(req.user.id);
+		return { data: transactions };
+	}
 }

@@ -26,6 +26,7 @@ import { LoginDto } from "../dto/login.dto";
 import { ForgotPasswordDto } from "../dto/forgot-password.dto";
 import { ResetPasswordDto } from "../dto/reset-password.dto";
 import { VerifyEmailDto } from "../dto/verify-email.dto";
+import { ResendOtpDto } from "../dto/resend-otp.dto";
 import { UpdateIndividualProfileDto } from "../dto/update-individual-profile.dto";
 import { UpdateOrganizationProfileDto } from "../dto/update-organization-profile.dto";
 import { ChangePasswordDto } from "../dto/change-password.dto";
@@ -327,6 +328,50 @@ export class AccountsAuthController {
 			body.email,
 			body.otp,
 		);
+	}
+
+	@Public()
+	@Post("resend-otp")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: "Resend email verification OTP",
+		description:
+			"Resend a new OTP code to the provided email address if the email is not yet verified.",
+	})
+	@ApiBody({
+		description: "Email address to resend OTP to",
+		type: ResendOtpDto,
+	})
+	@ApiResponse({
+		status: 200,
+		description:
+			"OTP resent successfully (if email exists and not verified)",
+		schema: {
+			type: "object",
+			properties: {
+				message: {
+					type: "string",
+					example:
+						"If the email exists and is not verified, a new OTP has been sent",
+				},
+			},
+		},
+	})
+	@ApiResponse({
+		status: 400,
+		description: "Email is already verified",
+		schema: {
+			type: "object",
+			properties: {
+				message: {
+					type: "string",
+					example: "Email is already verified",
+				},
+			},
+		},
+	})
+	async resendOtp(@Body() body: ResendOtpDto) {
+		return await this.accountsService.resendOtp(body.email);
 	}
 
 	@Public()

@@ -62,6 +62,19 @@ export class SubscriptionsRepository {
 		});
 	}
 
+	async findByTransactionReference(
+		reference: string,
+	): Promise<Subscription | null> {
+		return await this.subscriptions
+			.createQueryBuilder("subscription")
+			.leftJoinAndSelect("subscription.plan", "plan")
+			.leftJoinAndSelect("subscription.account", "account")
+			.where("subscription.metadata->>'transactionReference' = :reference", {
+				reference,
+			})
+			.getOne();
+	}
+
 	async createSubscription(
 		data: Partial<Subscription>,
 	): Promise<Subscription> {

@@ -5,6 +5,8 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { SubscriptionsRepository } from "../repository/subscriptions.repository";
+import { TransactionsRepository } from "../repository/transactions.repository";
+import { TransactionStatus } from "../entities/transaction.entity";
 import { PaystackService } from "./paystack.service";
 import { InitializeSubscriptionDto } from "../dto/initialize-subscription.dto";
 import { VerifyPaymentDto } from "../dto/verify-payment.dto";
@@ -16,6 +18,7 @@ import { EmailService } from "@/shared/email/service";
 export class SubscriptionsService {
 	constructor(
 		private readonly repo: SubscriptionsRepository,
+		private readonly transactionsRepo: TransactionsRepository,
 		private readonly paystack: PaystackService,
 		private readonly accountsRepo: AccountsRepository,
 		private readonly emailService: EmailService,
@@ -146,10 +149,42 @@ export class SubscriptionsService {
 			},
 		});
 
+		// Create transaction record
+		await this.transactionsRepo.createTransaction({
+			accountId,
+			subscriptionId: subscription.id,
+			planId: plan.id,
+			transactionReference: dto.reference,
+			status: TransactionStatus.SUCCESS,
+			amount: transaction.amount || plan.amount,
+			currency: transaction.currency || plan.currency,
+			paymentMethod: transaction.authorization?.channel || "Paystack",
+			paystackCustomerCode:
+				transaction.customer?.customer_code ||
+				transaction.customer?.code ||
+				null,
+			metadata: {
+				paystackTransactionId: transaction.id,
+				authorizationCode:
+					transaction.authorization?.authorization_code,
+			},
+		});
+
+		// Get user name from profile
+		let userName = account.email; // Fallback to email
+		if (account.role === "individual" && account.individualProfile) {
+			userName = `${account.individualProfile.firstName} ${account.individualProfile.lastName}`;
+		} else if (
+			account.role === "organization" &&
+			account.organizationProfile
+		) {
+			userName = account.organizationProfile.organizationName;
+		}
+
 		// Send activation email
 		await this.emailService.sendSubscriptionActivatedEmail(
 			account.email,
-			account.email, // TODO: Get actual user name from profile
+			userName,
 			plan.name,
 			nextMonth.toLocaleDateString(),
 		);
@@ -284,5 +319,26 @@ export class SubscriptionsService {
 				cancelAtPeriodEnd: false,
 			},
 		};
+	}
+
+	async getTransactionHistory(accountId: string) {
+		const transactions =
+			await this.transactionsRepo.findByAccountId(accountId);
+
+		return transactions.map((transaction) => ({
+			id: transaction.id,
+			transactionReference: transaction.transactionReference,
+			date: transaction.createdAt,
+			amount: transaction.amount,
+			currency: transaction.currency,
+			status: transaction.status,
+			plan: transaction.plan
+				? {
+						name: transaction.plan.name,
+						tier: transaction.plan.tier,
+					}
+				: null,
+			paymentMethod: transaction.paymentMethod,
+		}));
 	}
 }

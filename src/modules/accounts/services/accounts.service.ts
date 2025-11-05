@@ -124,6 +124,13 @@ export class AccountsService {
 		);
 		if (!ok) throw new UnauthorizedException("Invalid credentials");
 
+		// Check if email has been verified
+		if (!account.emailVerifiedAt) {
+			throw new UnauthorizedException(
+				"Please verify your email address before logging in",
+			);
+		}
+
 		await this.repo.updateLastLogin(account.id, new Date());
 
 		const token = this.utils.generateJWT({
@@ -153,6 +160,30 @@ export class AccountsService {
 			expiresAt,
 		});
 		await this.emailService.sendAccountVerificationEmail(email, otp);
+	}
+
+	async resendOtp(email: string) {
+		const account = await this.repo.findByEmail(email);
+		if (!account) {
+			// Don't reveal if email exists or not for security
+			return {
+				message:
+					"If the email exists and is not verified, a new OTP has been sent",
+			};
+		}
+
+		// Check if email is already verified
+		if (account.emailVerifiedAt) {
+			throw new BadRequestException("Email is already verified");
+		}
+
+		// Resend OTP
+		await this.sendEmailVerification(account.id, email);
+
+		return {
+			message:
+				"If the email exists and is not verified, a new OTP has been sent",
+		};
 	}
 
 	async getProfile(accountId: string) {
