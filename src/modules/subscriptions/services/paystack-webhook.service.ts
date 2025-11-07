@@ -299,27 +299,57 @@ export class PaystackWebhookService {
 		// Persist identifiers when a subscription is created and log
 		try {
 			const subscriptionCode = data.subscription_code || data.code;
-			if (subscriptionCode) {
-				const subscription =
-					await this.subscriptionsRepo.findByPaystackCode(
-						subscriptionCode,
-					);
-				if (subscription) {
-					const updateData: Partial<Subscription> = {
-						paystackSubscriptionCode: subscriptionCode,
-					};
-					if (data.email_token) {
-						updateData.paystackEmailToken = data.email_token;
-					}
-					await this.subscriptionsRepo.updateSubscription(
-						subscription.id,
-						updateData,
-					);
-				}
+			const emailToken = data.email_token;
+			const customerCode = data.customer?.customer_code;
+
+			if (!subscriptionCode) {
+				this.logger.warn(
+					"Subscription create event missing subscription_code",
+				);
+				return;
 			}
-			this.logger.log(
-				`Subscription created: ${subscriptionCode ?? "unknown"}`,
-			);
+
+			// Try to find subscription by subscription_code first (if already set)
+			let subscription =
+				await this.subscriptionsRepo.findByPaystackCode(
+					subscriptionCode,
+				);
+
+			// If not found, try finding by customer_code (for first-time subscriptions)
+			if (!subscription && customerCode) {
+				subscription =
+					await this.subscriptionsRepo.findByPaystackCustomerCode(
+						customerCode,
+					);
+			}
+
+			// If still not found, try finding by accountId from metadata (top-level)
+			if (!subscription && data.metadata?.accountId) {
+				subscription =
+					await this.subscriptionsRepo.findActiveSubscriptionByAccountId(
+						data.metadata.accountId,
+					);
+			}
+
+			if (subscription) {
+				const updateData: Partial<Subscription> = {
+					paystackSubscriptionCode: subscriptionCode,
+				};
+				if (emailToken) {
+					updateData.paystackEmailToken = emailToken;
+				}
+				await this.subscriptionsRepo.updateSubscription(
+					subscription.id,
+					updateData,
+				);
+				this.logger.log(
+					`Subscription ${subscription.id} updated with code: ${subscriptionCode}`,
+				);
+			} else {
+				this.logger.warn(
+					`Could not find subscription for subscription.create event. Code: ${subscriptionCode}, Customer: ${customerCode}`,
+				);
+			}
 		} catch (err) {
 			this.logger.error(
 				"Failed to persist subscription create data",

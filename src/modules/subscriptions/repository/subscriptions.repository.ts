@@ -69,10 +69,23 @@ export class SubscriptionsRepository {
 			.createQueryBuilder("subscription")
 			.leftJoinAndSelect("subscription.plan", "plan")
 			.leftJoinAndSelect("subscription.account", "account")
-			.where("subscription.metadata->>'transactionReference' = :reference", {
-				reference,
-			})
+			.where(
+				"subscription.metadata->>'transactionReference' = :reference",
+				{
+					reference,
+				},
+			)
 			.getOne();
+	}
+
+	async findByPaystackCustomerCode(
+		customerCode: string,
+	): Promise<Subscription | null> {
+		return await this.subscriptions.findOne({
+			where: { paystackCustomerCode: customerCode },
+			relations: ["plan", "account"],
+			order: { createdAt: "DESC" }, // Get most recent
+		});
 	}
 
 	async createSubscription(
