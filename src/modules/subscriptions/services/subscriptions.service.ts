@@ -93,6 +93,27 @@ export class SubscriptionsService {
 	}
 
 	async verifyPayment(accountId: string, dto: VerifyPaymentDto) {
+		// Check if subscription already exists (created by webhook)
+		const existingSubscription = await this.repo.findByTransactionReference(
+			dto.reference,
+		);
+		if (existingSubscription) {
+			// Webhook already processed this payment - just return success
+			return {
+				status: "active",
+				subscription: {
+					id: existingSubscription.id,
+					plan: {
+						name: existingSubscription.plan.name,
+						tier: existingSubscription.plan.tier,
+					},
+					startDate: existingSubscription.currentPeriodStart,
+					endDate: existingSubscription.currentPeriodEnd,
+					nextBillingDate: existingSubscription.nextBillingDate,
+				},
+			};
+		}
+
 		// Verify with Paystack
 		const paystackResponse = await this.paystack.verifyTransaction(
 			dto.reference,
