@@ -298,9 +298,19 @@ export class PaystackWebhookService {
 	private async handleSubscriptionCreate(data: any) {
 		// Persist identifiers when a subscription is created and log
 		try {
+			// Log the full webhook data for debugging
+			this.logger.log(
+				`Subscription.create webhook received. Full data: ${JSON.stringify(data, null, 2)}`,
+			);
+
 			const subscriptionCode = data.subscription_code || data.code;
 			const emailToken = data.email_token;
 			const customerCode = data.customer?.customer_code;
+			const accountId = data.metadata?.accountId;
+
+			this.logger.log(
+				`Extracted values - subscriptionCode: ${subscriptionCode}, emailToken: ${emailToken}, customerCode: ${customerCode}, accountId: ${accountId}`,
+			);
 
 			if (!subscriptionCode) {
 				this.logger.warn(
@@ -332,22 +342,28 @@ export class PaystackWebhookService {
 			}
 
 			if (subscription) {
+				this.logger.log(
+					`Found subscription ${subscription.id} by ${subscription.paystackSubscriptionCode ? "subscription_code" : customerCode ? "customer_code" : "accountId"}`,
+				);
 				const updateData: Partial<Subscription> = {
 					paystackSubscriptionCode: subscriptionCode,
 				};
 				if (emailToken) {
 					updateData.paystackEmailToken = emailToken;
 				}
+				this.logger.log(
+					`Updating subscription ${subscription.id} with: ${JSON.stringify(updateData)}`,
+				);
 				await this.subscriptionsRepo.updateSubscription(
 					subscription.id,
 					updateData,
 				);
 				this.logger.log(
-					`Subscription ${subscription.id} updated with code: ${subscriptionCode}`,
+					`Subscription ${subscription.id} updated successfully with code: ${subscriptionCode}, emailToken: ${emailToken}`,
 				);
 			} else {
 				this.logger.warn(
-					`Could not find subscription for subscription.create event. Code: ${subscriptionCode}, Customer: ${customerCode}`,
+					`Could not find subscription for subscription.create event. Code: ${subscriptionCode}, Customer: ${customerCode}, AccountId: ${accountId}`,
 				);
 			}
 		} catch (err) {
