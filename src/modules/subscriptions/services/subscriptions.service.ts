@@ -191,13 +191,35 @@ export class SubscriptionsService {
 			subscription.paystackEmailToken
 		) {
 			try {
-				await this.paystack.enableSubscription(
+				const paystackResponse = await this.paystack.enableSubscription(
 					subscription.paystackSubscriptionCode,
 					subscription.paystackEmailToken,
 				);
-			} catch (error) {
-				console.error("Error enabling Paystack subscription:", error);
+				// Log success
+				console.log(
+					`Paystack subscription ${subscription.paystackSubscriptionCode} enabled successfully:`,
+					paystackResponse,
+				);
+			} catch (error: any) {
+				// Log detailed error
+				console.error(
+					`Error enabling Paystack subscription ${subscription.paystackSubscriptionCode}:`,
+					error.message || error,
+				);
+				console.error("Error details:", error.response?.data || error);
+				// Re-throw error so user knows it failed
+				throw new BadRequestException(
+					`Failed to resume subscription on Paystack: ${error.response?.data?.message || error.message || "Unknown error"}`,
+				);
 			}
+		} else {
+			// Log warning if subscription codes are missing
+			console.warn(
+				`Cannot enable Paystack subscription: missing subscription code or email token. Subscription ID: ${subscription.id}, Code: ${subscription.paystackSubscriptionCode}, Token: ${subscription.paystackEmailToken ? "exists" : "missing"}`,
+			);
+			throw new BadRequestException(
+				"Cannot resume subscription: Paystack subscription code or email token is missing. Please contact support.",
+			);
 		}
 
 		return {

@@ -129,8 +129,22 @@ export class PaystackWebhookService {
 			this.logger.warn(
 				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}, Customer Code: ${customerCode}`,
 			);
+			// Log available subscriptions for debugging
+			if (customerCode) {
+				const allSubscriptions =
+					await this.subscriptionsRepo.findByPaystackCustomerCode(
+						customerCode,
+					);
+				this.logger.warn(
+					`Available subscriptions for customer ${customerCode}: ${allSubscriptions ? 1 : 0}`,
+				);
+			}
 			return;
 		}
+
+		this.logger.log(
+			`Found subscription ${subscription.id} for charge.success event`,
+		);
 
 		// Update billing dates
 		const now = new Date();
@@ -169,6 +183,9 @@ export class PaystackWebhookService {
 
 		// Create or update transaction record (for both first payments and renewals)
 		if (transactionReference) {
+			this.logger.log(
+				`Creating/updating transaction for reference: ${transactionReference}`,
+			);
 			const existingTransaction =
 				await this.transactionsRepo.findByReference(
 					transactionReference,
@@ -176,6 +193,9 @@ export class PaystackWebhookService {
 			if (!existingTransaction) {
 				// Determine if this is a renewal or first payment
 				const isRenewal = !!subscriptionCode;
+				this.logger.log(
+					`Creating new transaction ${transactionReference} (isRenewal: ${isRenewal})`,
+				);
 				await this.transactionsRepo.createTransaction({
 					accountId: subscription.accountId,
 					subscriptionId: subscription.id,
@@ -195,6 +215,10 @@ export class PaystackWebhookService {
 					},
 				});
 
+				this.logger.log(
+					`Transaction ${transactionReference} created successfully`,
+				);
+
 				// Update subscription metadata with transaction reference if not set
 				if (!subscription.metadata?.transactionReference) {
 					await this.subscriptionsRepo.updateSubscription(
@@ -208,11 +232,18 @@ export class PaystackWebhookService {
 					);
 				}
 			} else {
+				this.logger.log(
+					`Transaction ${transactionReference} already exists, updating status`,
+				);
 				await this.transactionsRepo.updateTransactionStatus(
 					transactionReference,
 					TransactionStatus.SUCCESS,
 				);
 			}
+		} else {
+			this.logger.warn(
+				`No transaction reference found in charge.success event for subscription ${subscription.id}`,
+			);
 		}
 
 		this.logger.log(
@@ -440,7 +471,6 @@ export class PaystackWebhookService {
 					: new Date();
 				const now = new Date();
 				const currentPeriodStart = now;
-				const currentPeriodEnd = new Date(nextPaymentDate);
 
 				// Create subscription
 				const newSubscription =
@@ -488,6 +518,61 @@ export class PaystackWebhookService {
 				this.logger.log(
 					`Subscription ${newSubscription.id} created successfully from webhook with code: ${subscriptionCode}`,
 				);
+
+				// Try to create transaction if we have a reference from most_recent_invoice
+				// Note: subscription.create webhook may not have transaction reference,
+				// but charge.success will create it when it arrives
+				const transactionReference =
+					data.most_recent_invoice?.transaction?.reference ||
+					data.metadata?.transactionReference;
+				if (transactionReference) {
+					try {
+						const existingTransaction =
+							await this.transactionsRepo.findByReference(
+								transactionReference,
+							);
+						if (!existingTransaction) {
+							await this.transactionsRepo.createTransaction({
+								accountId: account.id,
+								subscriptionId: newSubscription.id,
+								planId: plan.id,
+								transactionReference,
+								status: TransactionStatus.SUCCESS,
+								amount: data.amount || plan.amount,
+								currency: data.currency || plan.currency,
+								paymentMethod:
+									data.authorization?.channel || "Paystack",
+								paystackCustomerCode: customerCode,
+								metadata: {
+									paystackTransactionId: data.id,
+									isRenewal: false,
+									authorizationCode:
+										data.authorization?.authorization_code,
+								},
+							});
+
+							// Update subscription metadata with transaction reference
+							await this.subscriptionsRepo.updateSubscription(
+								newSubscription.id,
+								{
+									metadata: {
+										...newSubscription.metadata,
+										transactionReference,
+									},
+								},
+							);
+
+							this.logger.log(
+								`Transaction ${transactionReference} created for subscription ${newSubscription.id}`,
+							);
+						}
+					} catch (err) {
+						this.logger.error(
+							"Failed to create transaction in subscription.create",
+							err,
+						);
+					}
+				}
 			}
 		} catch (err) {
 			this.logger.error(
