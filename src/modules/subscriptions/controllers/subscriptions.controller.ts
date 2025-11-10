@@ -89,62 +89,6 @@ export class SubscriptionsController {
 	}
 
 	@UseGuards(AccountsAuthGuard)
-	@Get("verify")
-	@HttpCode(HttpStatus.OK)
-	@ApiOperation({
-		summary: "Verify payment and activate subscription",
-		description:
-			"Verify payment reference and activate subscription after successful payment",
-	})
-	@ApiQuery({
-		name: "reference",
-		required: true,
-		type: String,
-		description: "Payment reference from Paystack",
-	})
-	@ApiResponse({
-		status: 200,
-		description: "Payment verified and subscription activated",
-		schema: {
-			type: "object",
-			properties: {
-				status: { type: "string", example: "active" },
-				subscription: {
-					type: "object",
-					properties: {
-						id: { type: "string" },
-						plan: {
-							type: "object",
-							properties: {
-								name: { type: "string" },
-								tier: { type: "number" },
-							},
-						},
-						startDate: { type: "string", format: "date-time" },
-						endDate: { type: "string", format: "date-time" },
-						nextBillingDate: {
-							type: "string",
-							format: "date-time",
-						},
-					},
-				},
-			},
-		},
-	})
-	@ApiResponse({
-		status: 400,
-		description: "Payment not successful or verification failed",
-	})
-	async verifyPayment(
-		@Query("reference") reference: string,
-		@Req() req: any,
-	) {
-		return await this.subscriptionsService.verifyPayment(req.user.id, {
-			reference,
-		});
-	}
-
-	@UseGuards(AccountsAuthGuard)
 	@Get("status")
 	@ApiOperation({
 		summary: "Get current subscription status",

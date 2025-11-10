@@ -102,13 +102,14 @@ export class PaystackWebhookService {
 		// Successful payment - extend subscription
 		const subscriptionCode = data.subscription?.subscription_code;
 		const transactionReference = data.reference;
+		const customerCode = data.customer?.customer_code;
 
 		// Try to find subscription by subscription_code first (for renewals)
-		// If not found and we have a reference, try finding by transaction reference (for first payments)
 		let subscription = subscriptionCode
 			? await this.subscriptionsRepo.findByPaystackCode(subscriptionCode)
 			: null;
 
+		// If not found and we have a reference, try finding by transaction reference (for first payments)
 		if (!subscription && transactionReference) {
 			subscription =
 				await this.subscriptionsRepo.findByTransactionReference(
@@ -116,9 +117,17 @@ export class PaystackWebhookService {
 				);
 		}
 
+		// If still not found, try finding by customer code (for first payments before subscription.create)
+		if (!subscription && customerCode) {
+			subscription =
+				await this.subscriptionsRepo.findByPaystackCustomerCode(
+					customerCode,
+				);
+		}
+
 		if (!subscription) {
 			this.logger.warn(
-				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}`,
+				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}, Customer Code: ${customerCode}`,
 			);
 			return;
 		}
@@ -158,13 +167,15 @@ export class PaystackWebhookService {
 			updateData,
 		);
 
-		// Create or update transaction record for renewal
+		// Create or update transaction record (for both first payments and renewals)
 		if (transactionReference) {
 			const existingTransaction =
 				await this.transactionsRepo.findByReference(
 					transactionReference,
 				);
 			if (!existingTransaction) {
+				// Determine if this is a renewal or first payment
+				const isRenewal = !!subscriptionCode;
 				await this.transactionsRepo.createTransaction({
 					accountId: subscription.accountId,
 					subscriptionId: subscription.id,
@@ -173,13 +184,29 @@ export class PaystackWebhookService {
 					status: TransactionStatus.SUCCESS,
 					amount: data.amount || subscription.plan.amount,
 					currency: data.currency || subscription.plan.currency,
-					paymentMethod: "Paystack",
-					paystackCustomerCode: subscription.paystackCustomerCode,
+					paymentMethod: data.authorization?.channel || "Paystack",
+					paystackCustomerCode:
+						subscription.paystackCustomerCode || customerCode,
 					metadata: {
 						paystackTransactionId: data.id,
-						isRenewal: true,
+						isRenewal,
+						authorizationCode:
+							data.authorization?.authorization_code,
 					},
 				});
+
+				// Update subscription metadata with transaction reference if not set
+				if (!subscription.metadata?.transactionReference) {
+					await this.subscriptionsRepo.updateSubscription(
+						subscription.id,
+						{
+							metadata: {
+								...subscription.metadata,
+								transactionReference,
+							},
+						},
+					);
+				}
 			} else {
 				await this.transactionsRepo.updateTransactionStatus(
 					transactionReference,
@@ -188,7 +215,9 @@ export class PaystackWebhookService {
 			}
 		}
 
-		this.logger.log(`Subscription ${subscription.id} renewed successfully`);
+		this.logger.log(
+			`Subscription ${subscription.id} payment processed successfully`,
+		);
 	}
 
 	private async handlePaymentFailed(data: any) {
@@ -362,8 +391,102 @@ export class PaystackWebhookService {
 					`Subscription ${subscription.id} updated successfully with code: ${subscriptionCode}, emailToken: ${emailToken}`,
 				);
 			} else {
-				this.logger.warn(
-					`Could not find subscription for subscription.create event. Code: ${subscriptionCode}, Customer: ${customerCode}, AccountId: ${accountId}`,
+				// Subscription doesn't exist - create it from webhook data
+				this.logger.log(
+					`Subscription not found, creating from webhook data. Code: ${subscriptionCode}, Customer: ${customerCode}`,
+				);
+
+				// Find account by customer email
+				const customerEmail = data.customer?.email;
+				if (!customerEmail) {
+					this.logger.warn(
+						"Cannot create subscription: customer email not found in webhook",
+					);
+					return;
+				}
+
+				const account =
+					await this.accountsRepo.findByEmail(customerEmail);
+				if (!account) {
+					this.logger.warn(
+						`Cannot create subscription: account not found for email ${customerEmail}`,
+					);
+					return;
+				}
+
+				// Find plan by plan_code
+				const planCode = data.plan?.plan_code;
+				if (!planCode) {
+					this.logger.warn(
+						"Cannot create subscription: plan_code not found in webhook",
+					);
+					return;
+				}
+
+				const plan =
+					await this.subscriptionsRepo.findPlanByPaystackCode(
+						planCode,
+					);
+				if (!plan) {
+					this.logger.warn(
+						`Cannot create subscription: plan not found for code ${planCode}`,
+					);
+					return;
+				}
+
+				// Calculate dates from next_payment_date
+				const nextPaymentDate = data.next_payment_date
+					? new Date(data.next_payment_date)
+					: new Date();
+				const now = new Date();
+				const currentPeriodStart = now;
+				const currentPeriodEnd = new Date(nextPaymentDate);
+
+				// Create subscription
+				const newSubscription =
+					await this.subscriptionsRepo.createSubscription({
+						accountId: account.id,
+						planId: plan.id,
+						paystackCustomerCode: customerCode,
+						paystackSubscriptionCode: subscriptionCode,
+						paystackEmailToken: emailToken,
+						status: SubscriptionStatus.ACTIVE,
+						currentPeriodStart,
+						currentPeriodEnd: nextPaymentDate,
+						nextBillingDate: nextPaymentDate,
+						cancelAtPeriodEnd: false,
+						cancelledAt: null,
+						metadata: {
+							createdFromWebhook: true,
+							paymentMethod:
+								data.authorization?.channel || "Paystack",
+						},
+					});
+
+				// Get user name from profile
+				let userName = account.email;
+				if (
+					account.role === "individual" &&
+					account.individualProfile
+				) {
+					userName = `${account.individualProfile.firstName} ${account.individualProfile.lastName}`;
+				} else if (
+					account.role === "organization" &&
+					account.organizationProfile
+				) {
+					userName = account.organizationProfile.organizationName;
+				}
+
+				// Send activation email
+				await this.emailService.sendSubscriptionActivatedEmail(
+					account.email,
+					userName,
+					plan.name,
+					nextPaymentDate.toLocaleDateString(),
+				);
+
+				this.logger.log(
+					`Subscription ${newSubscription.id} created successfully from webhook with code: ${subscriptionCode}`,
 				);
 			}
 		} catch (err) {

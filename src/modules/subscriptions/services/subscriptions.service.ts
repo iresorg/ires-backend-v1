@@ -6,10 +6,8 @@ import {
 } from "@nestjs/common";
 import { SubscriptionsRepository } from "../repository/subscriptions.repository";
 import { TransactionsRepository } from "../repository/transactions.repository";
-import { TransactionStatus } from "../entities/transaction.entity";
 import { PaystackService } from "./paystack.service";
 import { InitializeSubscriptionDto } from "../dto/initialize-subscription.dto";
-import { VerifyPaymentDto } from "../dto/verify-payment.dto";
 import { SubscriptionStatus } from "../entities/subscription.entity";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import { EmailService } from "@/shared/email/service";
@@ -92,139 +90,6 @@ export class SubscriptionsService {
 		};
 	}
 
-	async verifyPayment(accountId: string, dto: VerifyPaymentDto) {
-		// Check if subscription already exists (created by webhook)
-		const existingSubscription = await this.repo.findByTransactionReference(
-			dto.reference,
-		);
-		if (existingSubscription) {
-			// Webhook already processed this payment - just return success
-			return {
-				status: "active",
-				subscription: {
-					id: existingSubscription.id,
-					plan: {
-						name: existingSubscription.plan.name,
-						tier: existingSubscription.plan.tier,
-					},
-					startDate: existingSubscription.currentPeriodStart,
-					endDate: existingSubscription.currentPeriodEnd,
-					nextBillingDate: existingSubscription.nextBillingDate,
-				},
-			};
-		}
-
-		// Verify with Paystack
-		const paystackResponse = await this.paystack.verifyTransaction(
-			dto.reference,
-		);
-
-		if (paystackResponse.data.status !== "success") {
-			throw new BadRequestException("Payment not successful");
-		}
-
-		const transaction = paystackResponse.data;
-
-		// Get account
-		const account = await this.accountsRepo.findById(accountId);
-		if (!account) {
-			throw new NotFoundException("Account not found");
-		}
-
-		// Extract metadata
-		const metadata = transaction.metadata || {};
-		const planId = metadata.planId || transaction.authorization.plan;
-
-		const plan = await this.repo.findPlanById(planId);
-		if (!plan) {
-			throw new NotFoundException("Subscription plan not found");
-		}
-
-		// Calculate subscription dates (1 month)
-		const now = new Date();
-		const nextMonth = new Date(now);
-		nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-		// Create subscription record
-		const subscription = await this.repo.createSubscription({
-			accountId,
-			planId: plan.id,
-			// Paystack verify payload: customer.customer_code (preferred) or customer.code (fallback)
-			paystackCustomerCode:
-				transaction.customer?.customer_code ||
-				transaction.customer?.code ||
-				null,
-			// Verify endpoint may not include subscription data; keep null and let webhook update it if missing
-			paystackSubscriptionCode:
-				transaction.subscription?.subscription_code || null,
-			paystackEmailToken: transaction.subscription?.email_token || null,
-			status: SubscriptionStatus.ACTIVE,
-			currentPeriodStart: now,
-			currentPeriodEnd: nextMonth,
-			nextBillingDate: nextMonth,
-			cancelAtPeriodEnd: false,
-			cancelledAt: null,
-			metadata: {
-				transactionReference: dto.reference,
-				paymentMethod: transaction.authorization.channel,
-			},
-		});
-
-		// Create transaction record
-		await this.transactionsRepo.createTransaction({
-			accountId,
-			subscriptionId: subscription.id,
-			planId: plan.id,
-			transactionReference: dto.reference,
-			status: TransactionStatus.SUCCESS,
-			amount: transaction.amount || plan.amount,
-			currency: transaction.currency || plan.currency,
-			paymentMethod: transaction.authorization?.channel || "Paystack",
-			paystackCustomerCode:
-				transaction.customer?.customer_code ||
-				transaction.customer?.code ||
-				null,
-			metadata: {
-				paystackTransactionId: transaction.id,
-				authorizationCode:
-					transaction.authorization?.authorization_code,
-			},
-		});
-
-		// Get user name from profile
-		let userName = account.email; // Fallback to email
-		if (account.role === "individual" && account.individualProfile) {
-			userName = `${account.individualProfile.firstName} ${account.individualProfile.lastName}`;
-		} else if (
-			account.role === "organization" &&
-			account.organizationProfile
-		) {
-			userName = account.organizationProfile.organizationName;
-		}
-
-		// Send activation email
-		await this.emailService.sendSubscriptionActivatedEmail(
-			account.email,
-			userName,
-			plan.name,
-			nextMonth.toLocaleDateString(),
-		);
-
-		return {
-			status: "active",
-			subscription: {
-				id: subscription.id,
-				plan: {
-					name: plan.name,
-					tier: plan.tier,
-				},
-				startDate: now,
-				endDate: nextMonth,
-				nextBillingDate: nextMonth,
-			},
-		};
-	}
-
 	async getSubscriptionStatus(accountId: string) {
 		const subscription =
 			await this.repo.findActiveSubscriptionByAccountId(accountId);
@@ -304,10 +169,11 @@ export class SubscriptionsService {
 	}
 
 	async resumeSubscription(accountId: string) {
-		const subscription = await this.repo.findById(accountId);
+		const subscription =
+			await this.repo.findActiveSubscriptionByAccountId(accountId);
 
 		if (!subscription) {
-			throw new NotFoundException("Subscription not found");
+			throw new NotFoundException("No active subscription found");
 		}
 
 		if (subscription.status !== SubscriptionStatus.ACTIVE) {

@@ -18,6 +18,14 @@ export class SubscriptionsRepository {
 		return await this.plans.findOne({ where: { id } });
 	}
 
+	async findPlanByPaystackCode(
+		paystackPlanCode: string,
+	): Promise<SubscriptionPlan | null> {
+		return await this.plans.findOne({
+			where: { paystackPlanCode },
+		});
+	}
+
 	async findAllPlans(accountType?: "individual" | "organization") {
 		if (accountType) {
 			const normalized = accountType.toLowerCase().trim() as
