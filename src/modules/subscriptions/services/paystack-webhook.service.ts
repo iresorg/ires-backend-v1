@@ -129,15 +129,50 @@ export class PaystackWebhookService {
 			this.logger.warn(
 				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}, Customer Code: ${customerCode}`,
 			);
-			// Log available subscriptions for debugging
-			if (customerCode) {
-				const allSubscriptions =
-					await this.subscriptionsRepo.findByPaystackCustomerCode(
-						customerCode,
+			// Subscription not found - create transaction anyway (subscription.create will link it later)
+			if (transactionReference && data.customer?.email) {
+				const customerEmail = data.customer.email;
+				const account =
+					await this.accountsRepo.findByEmail(customerEmail);
+				if (account) {
+					this.logger.log(
+						`Creating transaction ${transactionReference} without subscription link. Will be linked when subscription is created.`,
 					);
-				this.logger.warn(
-					`Available subscriptions for customer ${customerCode}: ${allSubscriptions ? 1 : 0}`,
-				);
+					try {
+						const existingTransaction =
+							await this.transactionsRepo.findByReference(
+								transactionReference,
+							);
+						if (!existingTransaction) {
+							await this.transactionsRepo.createTransaction({
+								accountId: account.id,
+								subscriptionId: null, // Will be linked later
+								planId: null, // Will be linked later
+								transactionReference,
+								status: TransactionStatus.SUCCESS,
+								amount: data.amount || 0,
+								currency: data.currency || "NGN",
+								paymentMethod:
+									data.authorization?.channel || "Paystack",
+								paystackCustomerCode: customerCode,
+								metadata: {
+									paystackTransactionId: data.id,
+									isRenewal: false,
+									authorizationCode:
+										data.authorization?.authorization_code,
+									pendingSubscriptionLink: true,
+								},
+							});
+							this.logger.log(
+								`Transaction ${transactionReference} created successfully (pending subscription link)`,
+							);
+						}
+					} catch (error: any) {
+						this.logger.error(
+							`Failed to create transaction without subscription: ${error.message || error}`,
+						);
+					}
+				}
 			}
 			return;
 		}
@@ -518,6 +553,50 @@ export class PaystackWebhookService {
 				this.logger.log(
 					`Subscription ${newSubscription.id} created successfully from webhook with code: ${subscriptionCode}`,
 				);
+
+				// Link any pending transactions for this account
+				// This handles the case where charge.success arrived before subscription.create
+				try {
+					const pendingTransactions =
+						await this.transactionsRepo.findByAccountId(account.id);
+					const pendingTransaction = pendingTransactions.find(
+						(t) =>
+							t.metadata?.pendingSubscriptionLink === true &&
+							!t.subscriptionId,
+					);
+					if (pendingTransaction) {
+						this.logger.log(
+							`Linking pending transaction ${pendingTransaction.transactionReference} to subscription ${newSubscription.id}`,
+						);
+						// Update the pending transaction with subscription and plan
+						await this.transactionsRepo.updateTransaction(
+							pendingTransaction.id,
+							{
+								subscriptionId: newSubscription.id,
+								planId: plan.id,
+								metadata: {
+									...pendingTransaction.metadata,
+									pendingSubscriptionLink: false,
+								},
+							},
+						);
+						// Update subscription metadata with transaction reference
+						await this.subscriptionsRepo.updateSubscription(
+							newSubscription.id,
+							{
+								metadata: {
+									...newSubscription.metadata,
+									transactionReference:
+										pendingTransaction.transactionReference,
+								},
+							},
+						);
+					}
+				} catch (error: any) {
+					this.logger.error(
+						`Failed to link pending transactions: ${error.message || error}`,
+					);
+				}
 
 				// Try to create transaction if we have a reference from most_recent_invoice
 				// Note: subscription.create webhook may not have transaction reference,

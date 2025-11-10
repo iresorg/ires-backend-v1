@@ -46,4 +46,11 @@ export class TransactionsRepository {
 			{ status },
 		);
 	}
+
+	async updateTransaction(
+		id: string,
+		data: Partial<SubscriptionTransaction>,
+	): Promise<void> {
+		await this.transactions.update({ id }, data);
+	}
 }
