@@ -28,6 +28,22 @@ export class TransactionsRepository {
 		});
 	}
 
+	async findByAccountIdPaginated(
+		accountId: string,
+		limit: number,
+		offset: number,
+	): Promise<{ transactions: SubscriptionTransaction[]; total: number }> {
+		const [transactions, total] = await this.transactions.findAndCount({
+			where: { accountId },
+			relations: ["plan", "subscription"],
+			order: { createdAt: "DESC" },
+			take: limit,
+			skip: offset,
+		});
+
+		return { transactions, total };
+	}
+
 	async findByReference(
 		reference: string,
 	): Promise<SubscriptionTransaction | null> {

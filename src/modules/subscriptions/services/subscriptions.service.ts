@@ -230,7 +230,39 @@ export class SubscriptionsService {
 		};
 	}
 
-	async getTransactionHistory(accountId: string) {
+	async getTransactionHistory(
+		accountId: string,
+		page?: number,
+		limit?: number,
+	) {
+		if (page && limit) {
+			const offset = (page - 1) * limit;
+			const { transactions, total } =
+				await this.transactionsRepo.findByAccountIdPaginated(
+					accountId,
+					limit,
+					offset,
+				);
+
+			const data = transactions.map((transaction) => ({
+				id: transaction.id,
+				transactionReference: transaction.transactionReference,
+				date: transaction.createdAt,
+				amount: transaction.amount,
+				currency: transaction.currency,
+				status: transaction.status,
+				plan: transaction.plan
+					? {
+							name: transaction.plan.name,
+							tier: transaction.plan.tier,
+						}
+					: null,
+				paymentMethod: transaction.paymentMethod,
+			}));
+
+			return { transactions: data, total };
+		}
+
 		const transactions =
 			await this.transactionsRepo.findByAccountId(accountId);
 

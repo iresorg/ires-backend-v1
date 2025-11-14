@@ -19,6 +19,8 @@ import {
 import { SubscriptionsService } from "../services/subscriptions.service";
 import { InitializeSubscriptionDto } from "../dto/initialize-subscription.dto";
 import { AccountsAuthGuard } from "@/shared/guards/accounts-auth.guard";
+import { buildPaginationResult } from "@/shared/utils/pagination.util";
+import { PaginationResult } from "@/shared/types/pagination-result.type";
 
 @ApiTags("Subscriptions")
 @Controller("subscriptions")
@@ -223,15 +225,87 @@ export class SubscriptionsController {
 	@Get("transactions")
 	@ApiOperation({
 		summary: "Get transaction history",
-		description: "Get all payment transactions for the current user",
+		description:
+			"Get payment transactions for the current user with optional pagination",
+	})
+	@ApiQuery({
+		name: "page",
+		required: false,
+		type: Number,
+		description: "Page number (starts from 1)",
+		example: 1,
+	})
+	@ApiQuery({
+		name: "limit",
+		required: false,
+		type: Number,
+		description: "Number of items per page (minimum 5)",
+		example: 10,
 	})
 	@ApiResponse({
 		status: 200,
 		description: "Transaction history retrieved successfully",
 		schema: {
-			type: "object",
-			properties: {
-				data: {
+			oneOf: [
+				{
+					type: "object",
+					properties: {
+						data: {
+							type: "array",
+							items: {
+								type: "object",
+								properties: {
+									id: { type: "string" },
+									transactionReference: {
+										type: "string",
+										example: "tx_1234567890",
+									},
+									date: {
+										type: "string",
+										format: "date-time",
+									},
+									amount: {
+										type: "number",
+										example: 15000000,
+									},
+									currency: {
+										type: "string",
+										example: "NGN",
+									},
+									status: {
+										type: "string",
+										enum: ["success", "failed", "pending"],
+										example: "success",
+									},
+									plan: {
+										type: "object",
+										nullable: true,
+										properties: {
+											name: {
+												type: "string",
+												example: "Essential Protection",
+											},
+											tier: {
+												type: "number",
+												example: 1,
+											},
+										},
+									},
+									paymentMethod: {
+										type: "string",
+										example: "Paystack",
+									},
+								},
+							},
+						},
+						total: { type: "number" },
+						limit: { type: "number" },
+						page: { type: "number" },
+						totalPages: { type: "number" },
+						nextPage: { type: "number", nullable: true },
+					},
+				},
+				{
 					type: "array",
 					items: {
 						type: "object",
@@ -270,16 +344,72 @@ export class SubscriptionsController {
 						},
 					},
 				},
-			},
+			],
 		},
 	})
 	@ApiResponse({
 		status: 401,
 		description: "Unauthorized - Invalid or missing token",
 	})
-	async getTransactionHistory(@Req() req: any) {
+	async getTransactionHistory(
+		@Req() req: any,
+		@Query("page") page?: string,
+		@Query("limit") limit?: string,
+	): Promise<
+		| PaginationResult<{
+				id: string;
+				transactionReference: string;
+				date: Date;
+				amount: number;
+				currency: string;
+				status: string;
+				plan: { name: string; tier: number } | null;
+				paymentMethod: string;
+		  }>
+		| Array<{
+				id: string;
+				transactionReference: string;
+				date: Date;
+				amount: number;
+				currency: string;
+				status: string;
+				plan: { name: string; tier: number } | null;
+				paymentMethod: string;
+		  }>
+	> {
+		const pageNum = page ? parseInt(page, 10) : undefined;
+		const limitNum = limit ? parseInt(limit, 10) : undefined;
+
+		if (pageNum && limitNum) {
+			const result =
+				await this.subscriptionsService.getTransactionHistory(
+					req.user.id,
+					pageNum,
+					limitNum,
+				);
+			if ("total" in result && "transactions" in result) {
+				return buildPaginationResult(
+					result.transactions,
+					result.total,
+					{
+						page: pageNum,
+						limit: limitNum,
+					},
+				);
+			}
+		}
+
 		const transactions =
 			await this.subscriptionsService.getTransactionHistory(req.user.id);
-		return { data: transactions };
+		return transactions as Array<{
+			id: string;
+			transactionReference: string;
+			date: Date;
+			amount: number;
+			currency: string;
+			status: string;
+			plan: { name: string; tier: number } | null;
+			paymentMethod: string;
+		}>;
 	}
 }

@@ -456,6 +456,53 @@ export class PaystackWebhookService {
 				this.logger.log(
 					`Subscription ${subscription.id} updated successfully with code: ${subscriptionCode}, emailToken: ${emailToken}`,
 				);
+
+				// Link any pending transactions for this subscription
+				// This handles the case where charge.success arrived before subscription.create
+				try {
+					const pendingTransactions =
+						await this.transactionsRepo.findByAccountId(
+							subscription.accountId,
+						);
+					const pendingTransaction = pendingTransactions.find(
+						(t) =>
+							t.metadata?.pendingSubscriptionLink === true &&
+							!t.subscriptionId,
+					);
+					if (pendingTransaction) {
+						this.logger.log(
+							`Linking pending transaction ${pendingTransaction.transactionReference} to subscription ${subscription.id}`,
+						);
+						await this.transactionsRepo.updateTransaction(
+							pendingTransaction.id,
+							{
+								subscriptionId: subscription.id,
+								planId: subscription.planId,
+								metadata: {
+									...pendingTransaction.metadata,
+									pendingSubscriptionLink: false,
+								},
+							},
+						);
+						await this.subscriptionsRepo.updateSubscription(
+							subscription.id,
+							{
+								metadata: {
+									...subscription.metadata,
+									transactionReference:
+										pendingTransaction.transactionReference,
+								},
+							},
+						);
+						this.logger.log(
+							`Pending transaction ${pendingTransaction.transactionReference} linked successfully to subscription ${subscription.id}`,
+						);
+					}
+				} catch (error: any) {
+					this.logger.error(
+						`Failed to link pending transactions: ${error.message || error}`,
+					);
+				}
 			} else {
 				// Subscription doesn't exist - create it from webhook data
 				this.logger.log(

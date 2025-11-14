@@ -4,7 +4,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Essential Protection",
 		tier: 1,
 		accountType: "individual" as const,
-		amount: 15000000, // ₦15,000 in kobo
+		amount: 1500000, // ₦15,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_zpdclk6rfprabvh",
@@ -23,7 +23,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Advanced Security",
 		tier: 2,
 		accountType: "individual" as const,
-		amount: 30000000, // ₦30,000 in kobo
+		amount: 3000000, // ₦30,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_n6ncggceegkbhbt",
@@ -43,7 +43,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Premium Defense",
 		tier: 3,
 		accountType: "individual" as const,
-		amount: 50000000, // ₦50,000 in kobo
+		amount: 5000000, // ₦50,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_ki46lweo54uhej3",
@@ -64,7 +64,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Business Shield",
 		tier: 1,
 		accountType: "organization" as const,
-		amount: 80000000, // ₦80,000 in kobo
+		amount: 8000000, // ₦80,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_nt6nyw5q6e7ck85",
@@ -83,7 +83,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Enterprise Guard",
 		tier: 2,
 		accountType: "organization" as const,
-		amount: 250000000, // ₦250,000 in kobo
+		amount: 25000000, // ₦250,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_eahyxv6lbjktbjq",
@@ -103,7 +103,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Corporate Fortress",
 		tier: 3,
 		accountType: "organization" as const,
-		amount: 500000000, // ₦500,000 in kobo
+		amount: 50000000, // ₦500,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_xosan7dk1d2vxnt",
