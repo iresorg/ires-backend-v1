@@ -21,6 +21,7 @@ import { RespondersModule } from "./modules/responders/responders.module";
 import { FileUploadModule } from "./modules/file-upload/module";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
+import { AdminModule } from "./modules/admin/admin.module";
 
 @Module({
 	imports: [
@@ -39,6 +40,7 @@ import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.modul
 		QueueModule,
 		AccountsModule,
 		SubscriptionsModule,
+		AdminModule,
 		TicketsModule,
 		TicketCategoriesModule,
 		AgentsModule,

@@ -113,4 +113,182 @@ export class AccountsRepository {
 			data,
 		);
 	}
+
+	async findAllWithFilters(options: {
+		search?: string;
+		role?: "individual" | "organization";
+		emailVerified?: "verified" | "not_verified";
+		joinedDateFrom?: Date;
+		joinedDateTo?: Date;
+		limit?: number;
+		offset?: number;
+	}): Promise<{ accounts: Account[]; total: number }> {
+		const queryBuilder = this.accounts
+			.createQueryBuilder("account")
+			.leftJoinAndSelect("account.individualProfile", "individualProfile")
+			.leftJoinAndSelect(
+				"account.organizationProfile",
+				"organizationProfile",
+			);
+
+		// Search by name or email
+		if (options.search) {
+			const searchTerm = `%${options.search.toLowerCase()}%`;
+			queryBuilder.where(
+				"(LOWER(account.email) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
+				{ search: searchTerm },
+			);
+		}
+
+		// Filter by role
+		if (options.role) {
+			if (options.search) {
+				queryBuilder.andWhere("account.role = :role", {
+					role: options.role,
+				});
+			} else {
+				queryBuilder.where("account.role = :role", {
+					role: options.role,
+				});
+			}
+		}
+
+		// Filter by email verification
+		if (options.emailVerified === "verified") {
+			if (options.search || options.role) {
+				queryBuilder.andWhere("account.email_verified_at IS NOT NULL");
+			} else {
+				queryBuilder.where("account.email_verified_at IS NOT NULL");
+			}
+		} else if (options.emailVerified === "not_verified") {
+			if (options.search || options.role) {
+				queryBuilder.andWhere("account.email_verified_at IS NULL");
+			} else {
+				queryBuilder.where("account.email_verified_at IS NULL");
+			}
+		}
+
+		// Filter by joined date range
+		if (options.joinedDateFrom) {
+			if (options.search || options.role || options.emailVerified) {
+				queryBuilder.andWhere("account.created_at >= :joinedDateFrom", {
+					joinedDateFrom: options.joinedDateFrom,
+				});
+			} else {
+				queryBuilder.where("account.created_at >= :joinedDateFrom", {
+					joinedDateFrom: options.joinedDateFrom,
+				});
+			}
+		}
+
+		if (options.joinedDateTo) {
+			if (
+				options.search ||
+				options.role ||
+				options.emailVerified ||
+				options.joinedDateFrom
+			) {
+				queryBuilder.andWhere("account.created_at <= :joinedDateTo", {
+					joinedDateTo: options.joinedDateTo,
+				});
+			} else {
+				queryBuilder.where("account.created_at <= :joinedDateTo", {
+					joinedDateTo: options.joinedDateTo,
+				});
+			}
+		}
+
+		// Get total count before applying pagination
+		const total = await queryBuilder.getCount();
+
+		// Apply pagination
+		if (options.limit !== undefined) {
+			queryBuilder.take(options.limit);
+		}
+		if (options.offset !== undefined) {
+			queryBuilder.skip(options.offset);
+		}
+
+		// Order by createdAt (property name, not column name)
+		queryBuilder.orderBy("account.createdAt", "DESC");
+
+		const accounts = await queryBuilder.getMany();
+
+		return { accounts, total };
+	}
+
+	async findSubscribersWithFilters(options: {
+		search?: string;
+		status?: string;
+		planId?: string;
+		limit?: number;
+		offset?: number;
+	}): Promise<{ accounts: Account[]; total: number }> {
+		const queryBuilder = this.accounts
+			.createQueryBuilder("account")
+			.leftJoinAndSelect("account.individualProfile", "individualProfile")
+			.leftJoinAndSelect(
+				"account.organizationProfile",
+				"organizationProfile",
+			)
+			.innerJoin(
+				"subscriptions",
+				"subscription",
+				"subscription.account_id = account.id",
+			)
+			.leftJoin("subscription.plan", "plan");
+
+		// Search by name or email
+		if (options.search) {
+			const searchTerm = `%${options.search.toLowerCase()}%`;
+			queryBuilder.where(
+				"(LOWER(account.email) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
+				{ search: searchTerm },
+			);
+		}
+
+		// Filter by subscription status
+		if (options.status) {
+			if (options.search) {
+				queryBuilder.andWhere("subscription.status = :status", {
+					status: options.status,
+				});
+			} else {
+				queryBuilder.where("subscription.status = :status", {
+					status: options.status,
+				});
+			}
+		}
+
+		// Filter by plan
+		if (options.planId) {
+			if (options.search || options.status) {
+				queryBuilder.andWhere("subscription.plan_id = :planId", {
+					planId: options.planId,
+				});
+			} else {
+				queryBuilder.where("subscription.plan_id = :planId", {
+					planId: options.planId,
+				});
+			}
+		}
+
+		// Get total count before applying pagination
+		const total = await queryBuilder.getCount();
+
+		// Apply pagination
+		if (options.limit !== undefined) {
+			queryBuilder.take(options.limit);
+		}
+		if (options.offset !== undefined) {
+			queryBuilder.skip(options.offset);
+		}
+
+		// Order by createdAt (property name, not column name)
+		queryBuilder.orderBy("subscription.createdAt", "DESC");
+
+		const accounts = await queryBuilder.getMany();
+
+		return { accounts, total };
+	}
 }
