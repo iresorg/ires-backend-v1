@@ -7,7 +7,6 @@ import {
   Section,
   Tailwind,
   Text,
-  Button,
 } from "@react-email/components";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -20,12 +19,7 @@ type AccountWelcomeParams = {
 };
 
 export default function AccountWelcome(params: AccountWelcomeParams) {
-  const {
-    headerText = "Welcome to iRes",
-    userName,
-    accountType,
-    loginUrl = `${process.env.PUBLIC_FRONTEND_URL}/login`,
-  } = params;
+  const { headerText = "Welcome to iRes", userName, accountType } = params;
 
   const accountTypeText =
     accountType === "individual" ? "Individual" : "Organization";
@@ -68,35 +62,9 @@ export default function AccountWelcome(params: AccountWelcomeParams) {
                 )}
               </div>
 
-              <div className="text-center mt-6">
-                <Button
-                  href={loginUrl}
-                  className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg text-base font-medium no-underline"
-                  style={{
-                    backgroundColor: "#3B82F6",
-                    color: "#FFFFFF",
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    fontSize: "16px",
-                    fontWeight: "500",
-                    textDecoration: "none",
-                    display: "inline-block",
-                  }}
-                >
-                  Access Your Account
-                </Button>
-              </div>
-
               <Text className="text-sm text-[#6b7280] mt-6">
                 If you have any questions or need assistance, please don't
                 hesitate to contact our support team.
-              </Text>
-
-              <Text className="text-xs text-[#9CA3AF] mt-4">
-                If the button doesn't work, copy and paste this link into your
-                browser:
-                <br />
-                {loginUrl}
               </Text>
             </Section>
 

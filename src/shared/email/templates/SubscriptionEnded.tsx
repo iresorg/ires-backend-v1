@@ -7,7 +7,6 @@ import {
   Section,
   Tailwind,
   Text,
-  Button,
 } from "@react-email/components";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -19,11 +18,7 @@ type SubscriptionEndedParams = {
 };
 
 export default function SubscriptionEnded(params: SubscriptionEndedParams) {
-  const {
-    userName,
-    planName,
-    renewUrl = `${process.env.PUBLIC_FRONTEND_URL}/subscription`,
-  } = params;
+  const { userName, planName } = params;
 
   return (
     <Html lang="en" dir="ltr">
@@ -55,15 +50,6 @@ export default function SubscriptionEnded(params: SubscriptionEndedParams) {
                   <li>Regular updates</li>
                   <li>Access to premium tools</li>
                 </ul>
-              </div>
-
-              <div className="text-center mt-6">
-                <Button
-                  href={renewUrl}
-                  className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg text-base font-medium no-underline"
-                >
-                  Renew Subscription
-                </Button>
               </div>
 
               <Text className="text-sm text-[#6b7280] mt-6">

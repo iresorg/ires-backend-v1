@@ -8,6 +8,7 @@ import {
   Tailwind,
   Text,
   Button,
+  Link,
 } from "@react-email/components";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -15,6 +16,7 @@ import Header from "./components/Header";
 type PasswordResetParams = {
   headerText?: string;
   resetToken: string;
+  email: string;
   resetUrl?: string;
 };
 
@@ -22,7 +24,8 @@ export default function PasswordReset(params: PasswordResetParams) {
   const {
     headerText = "Reset your password",
     resetToken,
-    resetUrl = `${process.env.PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`,
+    email,
+    resetUrl = `${process.env.PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`,
   } = params;
 
   return (
@@ -58,16 +61,27 @@ export default function PasswordReset(params: PasswordResetParams) {
                 </Button>
               </div>
 
-              <Text className="text-sm text-[#6b7280] mt-6">
-                If you didn't request this password reset, you can safely ignore
-                this email. Your password will not be changed.
+              <Text className="text-sm text-[#6b7280] mt-6 text-center">
+                Or click this link to reset your password:
               </Text>
 
-              <Text className="text-xs text-[#9CA3AF] mt-4">
-                If the button doesn't work, copy and paste this link into your
-                browser:
-                <br />
-                {resetUrl}
+              <Text className="text-sm mt-2 text-center">
+                <Link
+                  href={resetUrl}
+                  className="text-[#3B82F6] underline break-all"
+                  style={{
+                    color: "#3B82F6",
+                    textDecoration: "underline",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {resetUrl}
+                </Link>
+              </Text>
+
+              <Text className="text-xs text-[#9CA3AF] mt-6">
+                If you didn't request this password reset, you can safely ignore
+                this email. Your password will not be changed.
               </Text>
             </Section>
 

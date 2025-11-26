@@ -104,6 +104,7 @@ export class EmailService {
 			options: {
 				headerText: "Reset your password",
 				resetToken,
+				email,
 			},
 		};
 		await this.emailConsumer.publishEmailToQueue(payload);

@@ -7,7 +7,6 @@ import {
   Section,
   Tailwind,
   Text,
-  Button,
 } from "@react-email/components";
 import Footer from "./components/Footer";
 import Header from "./components/Header";
@@ -22,12 +21,7 @@ type SubscriptionActivatedParams = {
 export default function SubscriptionActivated(
   params: SubscriptionActivatedParams,
 ) {
-  const {
-    userName,
-    planName,
-    billingDate,
-    loginUrl = `${process.env.PUBLIC_FRONTEND_URL}/login`,
-  } = params;
+  const { userName, planName, billingDate } = params;
 
   return (
     <Html lang="en" dir="ltr">
@@ -57,15 +51,6 @@ export default function SubscriptionActivated(
                 <Text className="text-sm">
                   Next billing date: {billingDate}
                 </Text>
-              </div>
-
-              <div className="text-center mt-6">
-                <Button
-                  href={loginUrl}
-                  className="bg-[#3B82F6] text-white px-6 py-3 rounded-lg text-base font-medium no-underline"
-                >
-                  Access Dashboard
-                </Button>
               </div>
 
               <Text className="text-sm text-[#6b7280] mt-6">
