@@ -22,6 +22,7 @@ import { FileUploadModule } from "./modules/file-upload/module";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { NewsletterModule } from "./modules/newsletter/newsletter.module";
 
 @Module({
 	imports: [
@@ -41,6 +42,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 		AccountsModule,
 		SubscriptionsModule,
 		AdminModule,
+		NewsletterModule,
 		TicketsModule,
 		TicketCategoriesModule,
 		AgentsModule,
