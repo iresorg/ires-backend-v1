@@ -36,7 +36,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.19",
     "@nestjs/schedule": "^6.1.0",
-    "@nestjs/swagger": "^7.1.17",
+    "@nestjs/swagger": "^11.2.3",
     "@nestjs/typeorm": "^10.0.1",
     "@nestjs/websockets": "^10.4.19",
     "@react-email/components": "^0.0.42",
