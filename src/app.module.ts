@@ -23,6 +23,7 @@ import { AccountsModule } from "./modules/accounts/accounts.module";
 import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { NewsletterModule } from "./modules/newsletter/newsletter.module";
+import { StartupSeederService } from "./shared/database/startup-seeder.service";
 
 @Module({
 	imports: [
@@ -49,6 +50,7 @@ import { NewsletterModule } from "./modules/newsletter/newsletter.module";
 		RespondersModule,
 		FileUploadModule,
 	],
+	providers: [StartupSeederService],
 })
 export class AppModule implements NestModule {
 	constructor(private readonly logger: Logger) {}

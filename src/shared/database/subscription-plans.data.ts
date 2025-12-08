@@ -1,10 +1,10 @@
 export const SUBSCRIPTION_PLANS = [
 	// Individual Plans
 	{
-		name: "Essential Protection",
+		name: "Basic Shield",
 		tier: 1,
 		accountType: "individual" as const,
-		amount: 1500000, // ₦15,000 in kobo
+		amount: 5000000, // ₦50,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_zpdclk6rfprabvh",
@@ -14,16 +14,17 @@ export const SUBSCRIPTION_PLANS = [
 			"Social media account recovery",
 			"Basic scam & fraud advisory",
 			"Personal data privacy checks",
+			"1 cyber incident resolution / month",
 			"24–48 hrs response time",
 		],
 		maxIncidents: 1,
 		active: true,
 	},
 	{
-		name: "Advanced Security",
+		name: "Safe Guard",
 		tier: 2,
 		accountType: "individual" as const,
-		amount: 3000000, // ₦30,000 in kobo
+		amount: 8000000, // ₦80,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_n6ncggceegkbhbt",
@@ -34,16 +35,17 @@ export const SUBSCRIPTION_PLANS = [
 			"Payment fraud investigation",
 			"Social media & email breach recovery",
 			"Data loss prevention tips",
+			"Up to 2 incidents resolved / month",
 			"12–24 hrs response time",
 		],
 		maxIncidents: 2,
 		active: true,
 	},
 	{
-		name: "Premium Defense",
+		name: "Total Lockdown",
 		tier: 3,
 		accountType: "individual" as const,
-		amount: 5000000, // ₦50,000 in kobo
+		amount: 10000000, // ₦100,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_ki46lweo54uhej3",
@@ -54,9 +56,10 @@ export const SUBSCRIPTION_PLANS = [
 			"Comprehensive breach investigation",
 			"Device security optimization",
 			"Data recovery support",
+			"3 incidents resolution / month",
 			"4–6 hrs response time",
 		],
-		maxIncidents: 4,
+		maxIncidents: 3,
 		active: true,
 	},
 	// Organization Plans
@@ -64,7 +67,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Business Shield",
 		tier: 1,
 		accountType: "organization" as const,
-		amount: 8000000, // ₦80,000 in kobo
+		amount: 15000000, // ₦150,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
 		paystackPlanCode: "PLN_nt6nyw5q6e7ck85",
@@ -74,6 +77,7 @@ export const SUBSCRIPTION_PLANS = [
 			"Phishing & scam prevention",
 			"Basic ransomware & malware response",
 			"Website & email breach recovery",
+			"2 cyber incident resolution / month",
 			"24–48 hrs response time",
 		],
 		maxIncidents: 2,
@@ -94,6 +98,7 @@ export const SUBSCRIPTION_PLANS = [
 			"Ransomware containment & removal",
 			"DDoS attack mitigation",
 			"Payment system compromise investigation",
+			"Up to 5 incidents resolved / month",
 			"12–24 hrs response time",
 		],
 		maxIncidents: 5,
@@ -113,9 +118,10 @@ export const SUBSCRIPTION_PLANS = [
 			"Onsite & remote incident response",
 			"Insider threat detection",
 			"Advanced threat hunting & forensics",
+			"Unlimited incidents / month",
 			"SLA: under 4 hrs response time",
 		],
-		maxIncidents: null, // unlimited
+		maxIncidents: null,
 		active: true,
 	},
 ];
