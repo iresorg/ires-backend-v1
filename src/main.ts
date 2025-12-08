@@ -72,6 +72,13 @@ async function bootstrap() {
 		});
 	});
 
+	app.getHttpAdapter().get("/api/v1/health", (_, res: Response) => {
+		res.status(200).json({
+			status: "ok",
+			timestamp: new Date().toISOString(),
+		});
+	});
+
 	// setInterval(() => {
 	// 	const memoryUsage = process.memoryUsage();
 	// 	console.log('Memory Usage:', {

@@ -24,6 +24,8 @@ import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.modul
 import { AdminModule } from "./modules/admin/admin.module";
 import { NewsletterModule } from "./modules/newsletter/newsletter.module";
 import { StartupSeederService } from "./shared/database/startup-seeder.service";
+import { ScheduleModule } from "@nestjs/schedule";
+import { KeepAliveModule } from "./shared/keep-alive/keep-alive.module";
 
 @Module({
 	imports: [
@@ -31,6 +33,7 @@ import { StartupSeederService } from "./shared/database/startup-seeder.service";
 			isGlobal: true,
 			validate: validateEnv,
 		}),
+		ScheduleModule.forRoot(),
 		DatabaseModule,
 		JwtProviderModule,
 		AuthModule,
@@ -49,6 +52,7 @@ import { StartupSeederService } from "./shared/database/startup-seeder.service";
 		AgentsModule,
 		RespondersModule,
 		FileUploadModule,
+		KeepAliveModule,
 	],
 	providers: [StartupSeederService],
 })

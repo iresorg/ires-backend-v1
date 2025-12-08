@@ -15,7 +15,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
 		const ctx = host.switchToHttp();
 		const response = ctx.getResponse<Response>();
 		const request = ctx.getRequest<Request>();
-console.log(exception)
 		let status = HttpStatus.INTERNAL_SERVER_ERROR;
 		let message: string | string[] = "Something went wrong";
 
@@ -32,11 +31,18 @@ console.log(exception)
 			message = "Something went wrong: " + exception.message;
 		}
 
-		this.logger.error(message, {
-			stack: exception.stack,
-			status,
-			path: request.originalUrl,
-		});
+		const shouldSkipLogging =
+			status === HttpStatus.NOT_FOUND &&
+			(request.originalUrl?.startsWith("/_next/") ||
+				request.originalUrl?.startsWith("/favicon.ico"));
+
+		if (!shouldSkipLogging) {
+			this.logger.error(message, {
+				stack: exception.stack,
+				status,
+				path: request.originalUrl,
+			});
+		}
 
 		response.status(status).json({
 			message:
