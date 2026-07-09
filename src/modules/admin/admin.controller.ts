@@ -11,6 +11,7 @@ import { UsersQueryDto } from "./dto/users-query.dto";
 import { SubscribersQueryDto } from "./dto/subscribers-query.dto";
 import { UserResponseDto } from "./dto/user-response.dto";
 import { SubscriberResponseDto } from "./dto/subscriber-response.dto";
+import { OverviewResponseDto } from "./dto/overview-response.dto";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
@@ -24,6 +25,26 @@ import { PaginationResult } from "@/shared/types/pagination-result.type";
 @Controller("admin")
 export class AdminController {
 	constructor(private readonly adminService: AdminService) {}
+
+	@Get("overview")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Get admin dashboard overview",
+		description:
+			"Returns summary metrics, ticket status chart, user roles chart, and recent activity for the admin dashboard.",
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Admin dashboard overview data",
+		type: OverviewResponseDto,
+	})
+	@ApiResponse({
+		status: 403,
+		description: "Forbidden - Only SUPER_ADMIN and ADMIN can access",
+	})
+	async getOverview(): Promise<OverviewResponseDto> {
+		return this.adminService.getOverview();
+	}
 
 	@Get("users")
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
