@@ -72,6 +72,10 @@ export class EnvVariables {
 
 	@IsString()
 	@IsNotEmpty()
+	EMAIL_FROM: string;
+
+	@IsString()
+	@IsNotEmpty()
 	JWT_TOKEN_SECRET: string;
 
 	@IsString()

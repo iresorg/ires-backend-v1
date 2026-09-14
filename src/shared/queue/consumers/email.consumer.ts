@@ -51,6 +51,8 @@ export class EmailConsumer implements OnModuleInit {
 		this.mailer = nodemailer.createTransport({
 			host: this.configService.get("EMAIL_HOST"),
 			port: this.configService.get("EMAIL_PORT"),
+			secure: false,
+			requireTLS: true,
 			auth: {
 				user: this.configService.get("EMAIL_USER"),
 				pass: this.configService.get("EMAIL_PASSWORD"),
@@ -114,7 +116,15 @@ export class EmailConsumer implements OnModuleInit {
 		subject: string;
 		html: string;
 	}) {
-		await this.mailer.sendMail({ from, to, subject, html });
+		await this.mailer.sendMail({
+			from,
+			to,
+			subject,
+			html,
+			headers: {
+				"X-PM-Message-Stream": "outbound",
+			},
+		});
 	}
 
 	async publishEmailToQueue<T>(payload: EmailPayload<T>) {

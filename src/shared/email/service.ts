@@ -1,12 +1,21 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { EmailConsumer } from "../queue/consumers/email.consumer";
 import { EmailPayload } from "./types";
 import { Role } from "@/modules/users/enums/role.enum";
 import { TicketEscalateParams } from "./templates/TicketEscalated";
+import { EnvVariables } from "@/utils/env.validate";
 
 @Injectable()
 export class EmailService {
-	constructor(private readonly emailConsumer: EmailConsumer) {}
+	private readonly from: string;
+
+	constructor(
+		private readonly emailConsumer: EmailConsumer,
+		private readonly configService: ConfigService<EnvVariables>,
+	) {
+		this.from = this.configService.get("EMAIL_FROM");
+	}
 
 	async sendWelcomeEmail(
 		email: string,
@@ -15,7 +24,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"NewUser"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Welcome to iRes - Your Account Details",
 			template: "NewUser",
 			options: {
@@ -42,7 +51,7 @@ export class EmailService {
 	) {
 		const payload: EmailPayload<"NewTicket"> = {
 			to: email,
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Action Required - New Ticket Submitted",
 			template: "NewTicket",
 			options: {
@@ -68,7 +77,7 @@ export class EmailService {
 
 		const payload: EmailPayload<"TicketEscalated"> = {
 			to: email,
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Ticket Escalated: Action Required",
 			template: "TicketEscalated",
 			options: {
@@ -87,7 +96,7 @@ export class EmailService {
 	async sendAccountVerificationEmail(email: string, otp: string) {
 		const payload: EmailPayload<"VerifyEmail"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Verify your email",
 			template: "VerifyEmail",
 			options: { headerText: "Verify your email", otp },
@@ -98,7 +107,7 @@ export class EmailService {
 	async sendPasswordResetEmail(email: string, resetToken: string) {
 		const payload: EmailPayload<"PasswordReset"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Reset your password",
 			template: "PasswordReset",
 			options: {
@@ -117,7 +126,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"AccountWelcome"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Welcome to iRes - Your Account is Ready!",
 			template: "AccountWelcome",
 			options: {
@@ -138,7 +147,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"SubscriptionActivated"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Subscription Activated - Welcome!",
 			template: "SubscriptionActivated",
 			options: {
@@ -159,7 +168,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"SubscriptionCancelled"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Subscription Cancelled",
 			template: "SubscriptionCancelled",
 			options: {
@@ -179,7 +188,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"PaymentFailed"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Payment Failed - Action Required",
 			template: "PaymentFailed",
 			options: {
@@ -198,7 +207,7 @@ export class EmailService {
 	): Promise<void> {
 		const payload: EmailPayload<"SubscriptionEnded"> = {
 			to: [email],
-			from: "techsupport@iresorg.com",
+			from: this.from,
 			subject: "Subscription Expired",
 			template: "SubscriptionEnded",
 			options: {
