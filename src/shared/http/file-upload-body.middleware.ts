@@ -1,3 +1,4 @@
+import { IncomingMessage } from "http";
 import { NextFunction, Request, Response } from "express";
 
 const FILE_UPLOAD_ROUTES: Array<{ method: string; pattern: RegExp }> = [
@@ -12,9 +13,13 @@ const FILE_UPLOAD_ROUTES: Array<{ method: string; pattern: RegExp }> = [
 	{ method: "PUT", pattern: /^\/api\/v1\/accounts\/auth\/profile\/?$/ },
 ];
 
-export function isFileUploadRoute(req: Request): boolean {
-	const path = (req.originalUrl || req.url || "").split("?")[0];
-	const method = req.method.toUpperCase();
+export function isFileUploadRoute(req: IncomingMessage): boolean {
+	const path = (
+		("originalUrl" in req && typeof req.originalUrl === "string"
+			? req.originalUrl
+			: req.url) || ""
+	).split("?")[0];
+	const method = (req.method || "").toUpperCase();
 	return FILE_UPLOAD_ROUTES.some(
 		(route) => route.method === method && route.pattern.test(path),
 	);
