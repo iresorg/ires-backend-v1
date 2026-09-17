@@ -42,6 +42,32 @@ export class SubscriptionsRepository {
 		});
 	}
 
+	async findAllPlansForAdmin() {
+		return await this.plans.find({
+			order: { accountType: "ASC", tier: "ASC" },
+		});
+	}
+
+	async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
+		const plan = this.plans.create(data);
+		return await this.plans.save(plan);
+	}
+
+	async updatePlan(
+		id: string,
+		data: Partial<SubscriptionPlan>,
+	): Promise<void> {
+		await this.plans.update({ id }, data);
+	}
+
+	async deletePlan(id: string): Promise<void> {
+		await this.plans.delete({ id });
+	}
+
+	async countSubscriptionsByPlanId(planId: string): Promise<number> {
+		return await this.subscriptions.count({ where: { planId } });
+	}
+
 	async findActiveSubscriptionByAccountId(
 		accountId: string,
 	): Promise<Subscription | null> {

@@ -33,6 +33,6 @@ import { EmailModule } from "@/shared/email/module";
 		SubscriptionsRepository,
 		TransactionsRepository,
 	],
-	exports: [SubscriptionsService],
+	exports: [SubscriptionsService, SubscriptionsRepository, PaystackService],
 })
 export class SubscriptionsModule {}

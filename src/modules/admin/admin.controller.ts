@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from "@nestjs/common";
 import {
 	ApiTags,
 	ApiBearerAuth,
@@ -12,6 +12,10 @@ import { SubscribersQueryDto } from "./dto/subscribers-query.dto";
 import { UserResponseDto } from "./dto/user-response.dto";
 import { SubscriberResponseDto } from "./dto/subscriber-response.dto";
 import { OverviewResponseDto } from "./dto/overview-response.dto";
+import {
+	CreateSubscriptionPlanDto,
+	UpdateSubscriptionPlanDto,
+} from "./dto/subscription-plan.dto";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
@@ -262,5 +266,55 @@ export class AdminController {
 
 		const result = await this.adminService.getSubscribers(query);
 		return { subscribers: result.subscribers, total: result.total };
+	}
+
+	@Get("subscription-plans")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "List all subscription plans",
+		description:
+			"Returns every subscription plan, including inactive ones. Use this to edit amounts, features, and availability.",
+	})
+	async getSubscriptionPlans() {
+		const plans = await this.adminService.getSubscriptionPlans();
+		return { plans };
+	}
+
+	@Post("subscription-plans")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Create a subscription plan",
+		description:
+			"Create a plan in the database. If paystackPlanCode is omitted, a matching Paystack plan is created automatically. Amount is in kobo.",
+	})
+	async createSubscriptionPlan(@Body() dto: CreateSubscriptionPlanDto) {
+		const plan = await this.adminService.createSubscriptionPlan(dto);
+		return { message: "Subscription plan created", plan };
+	}
+
+	@Patch("subscription-plans/:id")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Update a subscription plan",
+		description:
+			"Update amount, features, name, or active status. Amount changes are synced to Paystack for new subscribers.",
+	})
+	async updateSubscriptionPlan(
+		@Param("id") id: string,
+		@Body() dto: UpdateSubscriptionPlanDto,
+	) {
+		const plan = await this.adminService.updateSubscriptionPlan(id, dto);
+		return { message: "Subscription plan updated", plan };
+	}
+
+	@Delete("subscription-plans/:id")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Delete or deactivate a subscription plan",
+		description:
+			"Deletes the plan if nobody is subscribed. If subscribers exist, the plan is deactivated instead.",
+	})
+	async deleteSubscriptionPlan(@Param("id") id: string) {
+		return this.adminService.deleteSubscriptionPlan(id);
 	}
 }

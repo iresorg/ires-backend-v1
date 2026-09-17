@@ -130,6 +130,50 @@ export class PaystackService {
 		}
 	}
 
+	async createPlan(data: {
+		name: string;
+		interval: string;
+		amount: number;
+		currency?: string;
+		description?: string;
+	}) {
+		try {
+			const response = await axios.post(`${this.baseURL}/plan`, data, {
+				headers: this.getHeaders(),
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack create plan error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
+	async updatePlan(
+		planCode: string,
+		data: {
+			name?: string;
+			interval?: string;
+			amount?: number;
+			currency?: string;
+			description?: string;
+			update_existing_subscriptions?: boolean;
+		},
+	) {
+		try {
+			const response = await axios.put(
+				`${this.baseURL}/plan/${planCode}`,
+				data,
+				{ headers: this.getHeaders() },
+			);
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack update plan error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
 	verifyWebhookSignature(payload: string, signature: string): boolean {
 		const hash = crypto
 			.createHmac("sha512", this.secretKey)
