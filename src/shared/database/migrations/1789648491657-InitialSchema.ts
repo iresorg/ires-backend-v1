@@ -4,6 +4,11 @@ export class InitialSchema1789648491657 implements MigrationInterface {
     name = 'InitialSchema1789648491657'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        const hasUsersTable = await queryRunner.hasTable("users");
+        if (hasUsersTable) {
+            return;
+        }
+
         await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
         await queryRunner.query(`CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT 'now()', "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "first_name" character varying NOT NULL, "last_name" character varying NOT NULL, "email" character varying NOT NULL, "password" character varying NOT NULL, "role" character varying NOT NULL, "status" character varying NOT NULL DEFAULT 'active', "last_login" character varying, "avatar" jsonb, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE TABLE "ticket_sub_category" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT 'now()', "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "name" character varying NOT NULL, "category_id" uuid, CONSTRAINT "PK_5c6053949d9faeb3133546f80e1" PRIMARY KEY ("id"))`);

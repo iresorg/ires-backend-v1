@@ -18,6 +18,8 @@ import {
 import {
 	ApiTags,
 	ApiBearerAuth,
+	ApiConsumes,
+	ApiBody,
 	ApiOperation,
 	ApiResponse,
 	ApiParam,
@@ -45,6 +47,19 @@ export class AgentsController {
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
+	@ApiBody({
+		schema: {
+			type: "object",
+			required: ["firstName", "lastName", "email"],
+			properties: {
+				firstName: { type: "string" },
+				lastName: { type: "string" },
+				email: { type: "string" },
+				avatar: { type: "string", format: "binary" },
+			},
+		},
+	})
 	@ApiOperation({
 		summary: "Create a new agent",
 		description:
@@ -196,6 +211,7 @@ export class AgentsController {
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
 	@ApiOperation({
 		summary: "Update agent",
 		description:
