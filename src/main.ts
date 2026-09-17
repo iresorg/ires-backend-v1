@@ -5,14 +5,14 @@ import helmet from "helmet";
 import { ValidationPipe } from "@nestjs/common";
 import { AllExceptionsFilter } from "./shared/filters/all-exceptions.filters";
 import { Logger } from "./shared/logger/service";
-import { Response } from "express";
+import { json, urlencoded, Response } from "express";
 import { ConfigService } from "@nestjs/config";
 import * as bodyParser from "body-parser";
 import { EnvVariables } from "./utils/env.validate";
 import * as cors from "cors";
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule);
+	const app = await NestFactory.create(AppModule, { bodyParser: false });
 	const logger = await app.resolve(Logger);
 	const env = await app.resolve(ConfigService<EnvVariables>);
 
@@ -109,6 +109,8 @@ async function bootstrap() {
 		"/api/v1/webhooks/paystack",
 		bodyParser.raw({ type: "*/*", limit: "1mb" }),
 	);
+	app.use(json({ limit: "10mb" }));
+	app.use(urlencoded({ extended: true, limit: "10mb" }));
 
 	const config = new DocumentBuilder()
 		.setTitle("iRES API")

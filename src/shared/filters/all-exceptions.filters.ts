@@ -27,6 +27,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
 			} else {
 				message = exceptionResponse || exception.message;
 			}
+		} else if (
+			exception instanceof Error &&
+			(exception.name === "PayloadTooLargeError" ||
+				exception.message === "request entity too large")
+		) {
+			status = HttpStatus.PAYLOAD_TOO_LARGE;
+			message = "Request entity too large. Use an image under 10MB.";
 		} else if (exception instanceof Error) {
 			message = "Something went wrong: " + exception.message;
 		}
