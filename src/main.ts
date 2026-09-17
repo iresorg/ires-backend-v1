@@ -10,10 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import * as bodyParser from "body-parser";
 import { EnvVariables } from "./utils/env.validate";
 import * as cors from "cors";
-import {
-	isFileUploadRoute,
-	restoreMultipartContentType,
-} from "./shared/http/file-upload-body.middleware";
+import { isFileUploadRoute } from "./shared/http/file-upload-body.middleware";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -113,7 +110,6 @@ async function bootstrap() {
 		"/api/v1/webhooks/paystack",
 		bodyParser.raw({ type: "*/*", limit: "1mb" }),
 	);
-	app.use(restoreMultipartContentType);
 	app.use(
 		json({
 			limit: "10mb",
