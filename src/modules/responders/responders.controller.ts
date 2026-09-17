@@ -18,6 +18,8 @@ import {
 import {
 	ApiTags,
 	ApiBearerAuth,
+	ApiConsumes,
+	ApiBody,
 	ApiOperation,
 	ApiResponse,
 	ApiParam,
@@ -45,6 +47,23 @@ export class RespondersController {
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.RESPONDER_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
+	@ApiBody({
+		schema: {
+			type: "object",
+			required: ["firstName", "lastName", "email", "role"],
+			properties: {
+				firstName: { type: "string" },
+				lastName: { type: "string" },
+				email: { type: "string" },
+				role: {
+					type: "string",
+					enum: ["RESPONDER_TIER_1", "RESPONDER_TIER_2"],
+				},
+				avatar: { type: "string", format: "binary" },
+			},
+		},
+	})
 	@ApiOperation({
 		summary: "Create a new responder",
 		description:
@@ -197,6 +216,7 @@ export class RespondersController {
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.RESPONDER_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
 	@ApiOperation({
 		summary: "Update responder",
 		description:
