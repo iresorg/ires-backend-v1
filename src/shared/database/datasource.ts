@@ -22,8 +22,10 @@ import { SubscriptionTransaction } from "@/modules/subscriptions/entities/transa
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
+	options: { loadMigrations?: boolean } = {},
 ): DataSourceOptions {
 	const config = env || validateEnv(process.env);
+	const loadMigrations = options.loadMigrations ?? true;
 
 	return {
 		type: "postgres",
@@ -49,7 +51,9 @@ export function createDataSourceOptions(
 			PaystackEvent,
 			SubscriptionTransaction,
 		],
-		migrations: ["src/shared/database/migrations/*.ts"],
+		migrations: loadMigrations
+			? ["src/shared/database/migrations/*.ts"]
+			: [],
 		migrationsTableName: "migrations",
 		synchronize: config.NODE_ENV !== Environment.Production,
 		logging: false,
@@ -64,14 +68,18 @@ export function createDataSourceOptions(
 export function createDataSourceFactory(
 	configService: ConfigService<EnvVariables>,
 ): DataSourceOptions {
-	return createDataSourceOptions({
-		DB_HOST: configService.get("DB_HOST"),
-		DB_PORT: configService.get("DB_PORT"),
-		DB_USER: configService.get("DB_USER"),
-		DB_PASS: configService.get("DB_PASS"),
-		DB_NAME: configService.get("DB_NAME"),
-		NODE_ENV: configService.get("NODE_ENV"),
-	});
+	return createDataSourceOptions(
+		{
+			DB_HOST: configService.get("DB_HOST"),
+			DB_PORT: configService.get("DB_PORT"),
+			DB_USER: configService.get("DB_USER"),
+			DB_PASS: configService.get("DB_PASS"),
+			DB_NAME: configService.get("DB_NAME"),
+			DB_SSL: configService.get("DB_SSL"),
+			NODE_ENV: configService.get("NODE_ENV"),
+		},
+		{ loadMigrations: false },
+	);
 }
 
 export const env = validateEnv(process.env);
