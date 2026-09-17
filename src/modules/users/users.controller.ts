@@ -19,6 +19,8 @@ import { UsersService } from "./users.service";
 import {
 	ApiBearerAuth,
 	ApiTags,
+	ApiConsumes,
+	ApiBody,
 	ApiOperation,
 	ApiResponse,
 	ApiParam,
@@ -192,6 +194,20 @@ export class UsersController {
 	@Post()
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
+	@ApiBody({
+		schema: {
+			type: "object",
+			required: ["firstName", "lastName", "email"],
+			properties: {
+				firstName: { type: "string" },
+				lastName: { type: "string" },
+				email: { type: "string" },
+				role: { type: "string", enum: Object.values(Role) },
+				avatar: { type: "string", format: "binary" },
+			},
+		},
+	})
 	@ApiOperation({ summary: "Create a new user" })
 	@ApiResponse({
 		status: 201,
@@ -242,6 +258,7 @@ export class UsersController {
 
 	@Put("profile")
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
 	@ApiOperation({
 		summary: "Update user profile",
 		description: "Update the current user profile information.",
@@ -276,6 +293,7 @@ export class UsersController {
 	@Put(":id")
 	@Roles(Role.SUPER_ADMIN, Role.AGENT_ADMIN, Role.RESPONDER_ADMIN)
 	@UseInterceptors(FileInterceptor("avatar"))
+	@ApiConsumes("multipart/form-data")
 	@ApiOperation({ summary: "Update user" })
 	@ApiResponse({
 		status: 200,

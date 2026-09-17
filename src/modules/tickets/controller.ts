@@ -19,7 +19,7 @@ import {
 	ITicketSummary,
 	TicketStatus,
 } from "./interfaces/ticket.interface";
-import { ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
+import { ApiConsumes, ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
 import {
 	EscalateTicketDto,
@@ -44,6 +44,34 @@ export class TicketsController {
 	constructor(private readonly ticketsService: TicketsService) {}
 
 	@ApiOperation({ summary: "Create a new ticket" })
+	@ApiConsumes("multipart/form-data")
+	@ApiBody({
+		schema: {
+			type: "object",
+			required: [
+				"title",
+				"type",
+				"description",
+				"location",
+				"reporterName",
+				"categoryId",
+			],
+			properties: {
+				title: { type: "string" },
+				type: { type: "string" },
+				description: { type: "string" },
+				location: { type: "string" },
+				reporterName: { type: "string" },
+				categoryId: { type: "string" },
+				subCategoryId: { type: "string" },
+				internalNotes: { type: "string" },
+				attachments: {
+					type: "array",
+					items: { type: "string", format: "binary" },
+				},
+			},
+		},
+	})
 	@UseInterceptors(FilesInterceptor("attachments"))
 	@ApiResponse({ status: 201, description: "Ticket created successfully" })
 	@Post()
