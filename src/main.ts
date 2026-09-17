@@ -109,7 +109,18 @@ async function bootstrap() {
 		"/api/v1/webhooks/paystack",
 		bodyParser.raw({ type: "*/*", limit: "1mb" }),
 	);
-	app.use(json({ limit: "10mb" }));
+	app.use(
+		json({
+			limit: "10mb",
+			type: (req) => {
+				const contentType = String(req.headers["content-type"] || "");
+				return (
+					contentType.includes("application/json") &&
+					!contentType.includes("multipart/form-data")
+				);
+			},
+		}),
+	);
 	app.use(urlencoded({ extended: true, limit: "10mb" }));
 
 	const config = new DocumentBuilder()
