@@ -634,15 +634,25 @@ export class AdminService {
 			throw new NotFoundException("Subscription plan not found");
 		}
 
-		const subscriberCount =
-			await this.subscriptionsRepo.countSubscriptionsByPlanId(id);
-		if (subscriberCount > 0) {
+		const [subscriberCount, transactionCount, creditCount] =
+			await Promise.all([
+				this.subscriptionsRepo.countSubscriptionsByPlanId(id),
+				this.transactionsRepo.countByPlanId(id),
+				this.incidentCredits.count({ where: { planId: id } }),
+			]);
+
+		if (subscriberCount > 0 || transactionCount > 0 || creditCount > 0) {
 			await this.subscriptionsRepo.updatePlan(id, { active: false });
 			return {
 				message:
-					"Plan has existing subscribers, so it was deactivated instead of deleted",
+					"Plan has linked subscribers, payments, or credits, so it was deactivated instead of deleted",
 				id,
 				active: false,
+				linked: {
+					subscribers: subscriberCount,
+					transactions: transactionCount,
+					credits: creditCount,
+				},
 			};
 		}
 

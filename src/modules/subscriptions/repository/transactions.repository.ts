@@ -106,4 +106,8 @@ export class TransactionsRepository {
 	): Promise<void> {
 		await this.transactions.update({ id }, data);
 	}
+
+	async countByPlanId(planId: string): Promise<number> {
+		return await this.transactions.count({ where: { planId } });
+	}
 }
