@@ -12,6 +12,26 @@ export class PaystackService {
 		this.secretKey = this.config.get<string>("PAYSTACK_SECRET_KEY") || "";
 	}
 
+	/**
+	 * Restrict path segments used in Paystack URLs to a conservative allowlist
+	 * (blocks path traversal / host injection style SSRF via user-controlled codes).
+	 */
+	private sanitizePathSegment(
+		value: string,
+		label: string,
+		maxLength = 64,
+	): string {
+		const trimmed = value?.trim();
+		if (
+			!trimmed ||
+			trimmed.length > maxLength ||
+			!/^[A-Za-z0-9_-]+$/.test(trimmed)
+		) {
+			throw new Error(`Invalid Paystack ${label} format`);
+		}
+		return trimmed;
+	}
+
 	private getHeaders() {
 		return {
 			Authorization: `Bearer ${this.secretKey}`,
@@ -42,8 +62,11 @@ export class PaystackService {
 
 	async verifyTransaction(reference: string) {
 		try {
+			const safeReference = encodeURIComponent(
+				this.sanitizePathSegment(reference, "transaction reference", 128),
+			);
 			const response = await axios.get(
-				`${this.baseURL}/transaction/verify/${reference}`,
+				`${this.baseURL}/transaction/verify/${safeReference}`,
 				{ headers: this.getHeaders() },
 			);
 			return response.data;
@@ -161,8 +184,11 @@ export class PaystackService {
 		},
 	) {
 		try {
+			const safePlanCode = encodeURIComponent(
+				this.sanitizePathSegment(planCode, "plan code"),
+			);
 			const response = await axios.put(
-				`${this.baseURL}/plan/${planCode}`,
+				`${this.baseURL}/plan/${safePlanCode}`,
 				data,
 				{ headers: this.getHeaders() },
 			);
