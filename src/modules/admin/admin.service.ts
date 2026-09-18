@@ -115,6 +115,46 @@ export class AdminService {
 			return this.getPaygSubscribers(query);
 		}
 
+		if (query.paymentType === PlanPaymentType.SUBSCRIPTION) {
+			return this.getRecurringSubscribers(query);
+		}
+
+		// No paymentType → recurring + PAYG in one list
+		const unpaged = { ...query, page: undefined, limit: undefined };
+		const [recurring, payg] = await Promise.all([
+			this.getRecurringSubscribers(unpaged),
+			this.getPaygSubscribers(unpaged),
+		]);
+
+		const merged = [...recurring.subscribers, ...payg.subscribers].sort(
+			(a, b) => {
+				const aTime = a.startDate
+					? new Date(a.startDate).getTime()
+					: 0;
+				const bTime = b.startDate
+					? new Date(b.startDate).getTime()
+					: 0;
+				return bTime - aTime;
+			},
+		);
+
+		const total = merged.length;
+		const { page, limit } = query;
+		if (page && limit) {
+			const offset = (page - 1) * limit;
+			return {
+				subscribers: merged.slice(offset, offset + limit),
+				total,
+			};
+		}
+
+		return { subscribers: merged, total };
+	}
+
+	private async getRecurringSubscribers(query: SubscribersQueryDto): Promise<{
+		subscribers: SubscriberResponseDto[];
+		total: number;
+	}> {
 		const { search, status, planId, page, limit } = query;
 		const offset = page && limit ? (page - 1) * limit : undefined;
 
@@ -127,9 +167,10 @@ export class AdminService {
 				"organizationProfile",
 			)
 			.leftJoinAndSelect("subscription.plan", "plan")
-			.andWhere("plan.payment_type = :paymentType", {
-				paymentType: PlanPaymentType.SUBSCRIPTION,
-			});
+			.andWhere(
+				"(plan.payment_type = :paymentType OR plan.payment_type IS NULL)",
+				{ paymentType: PlanPaymentType.SUBSCRIPTION },
+			);
 
 		if (search) {
 			const searchTerm = `%${search.toLowerCase()}%`;
@@ -428,6 +469,12 @@ export class AdminService {
 		});
 	}
 
+	private isValidPaystackPlanCode(code: string | null | undefined): boolean {
+		if (!code) return false;
+		// Paystack plan codes look like PLN_xxxxx — reject UUIDs / junk stored by mistake
+		return /^PLN_[A-Za-z0-9]+$/i.test(code.trim());
+	}
+
 	async updateSubscriptionPlan(id: string, dto: UpdateSubscriptionPlanDto) {
 		const plan = await this.subscriptionsRepo.findPlanById(id);
 		if (!plan) {
@@ -444,6 +491,11 @@ export class AdminService {
 			if (isPayg) {
 				throw new BadRequestException(
 					"Pay-as-you-go products cannot have a Paystack plan code",
+				);
+			}
+			if (!this.isValidPaystackPlanCode(dto.paystackPlanCode)) {
+				throw new BadRequestException(
+					"paystackPlanCode must be a valid Paystack plan code (e.g. PLN_xxxxx)",
 				);
 			}
 			const existing =
@@ -464,27 +516,84 @@ export class AdminService {
 			: (dto.interval ?? plan.interval ?? "monthly");
 		const nextCurrency = dto.currency ?? plan.currency;
 		const nextDescription = dto.description ?? plan.description;
-		const paystackPlanCode = isPayg
+		let resolvedPaystackCode: string | null = isPayg
 			? null
 			: (dto.paystackPlanCode ?? plan.paystackPlanCode);
 
-		const shouldSyncPaystack =
-			!isPayg &&
-			!!paystackPlanCode &&
-			(dto.amount !== undefined ||
-				dto.name !== undefined ||
-				dto.interval !== undefined ||
-				dto.description !== undefined);
+		const pricingChanged =
+			dto.amount !== undefined ||
+			dto.name !== undefined ||
+			dto.interval !== undefined ||
+			dto.description !== undefined;
 
-		if (shouldSyncPaystack) {
-			await this.paystack.updatePlan(paystackPlanCode, {
-				name: nextName,
-				interval: nextInterval ?? "monthly",
-				amount: nextAmount,
-				currency: nextCurrency,
-				description: nextDescription,
-				update_existing_subscriptions: false,
-			});
+		// Recurring plans need a live Paystack plan. Sync updates; recreate if code is missing/stale.
+		if (!isPayg && (pricingChanged || !resolvedPaystackCode)) {
+			try {
+				if (this.isValidPaystackPlanCode(resolvedPaystackCode)) {
+					await this.paystack.updatePlan(resolvedPaystackCode!, {
+						name: nextName,
+						interval: nextInterval ?? "monthly",
+						amount: nextAmount,
+						currency: nextCurrency,
+						description: nextDescription,
+						update_existing_subscriptions: false,
+					});
+				} else {
+					const created = await this.paystack.createPlan({
+						name: nextName,
+						interval: nextInterval ?? "monthly",
+						amount: nextAmount,
+						currency: nextCurrency,
+						description: nextDescription,
+					});
+					resolvedPaystackCode = created?.data?.plan_code ?? null;
+					if (!resolvedPaystackCode) {
+						throw new BadRequestException(
+							"Paystack did not return a plan code",
+						);
+					}
+				}
+			} catch (error: any) {
+				const message =
+					typeof error?.message === "string"
+						? error.message
+						: "Paystack plan sync failed";
+				const isInvalidRemote =
+					/plan id\/code specified is invalid/i.test(message) ||
+					/invalid plan/i.test(message);
+
+				if (
+					isInvalidRemote &&
+					this.isValidPaystackPlanCode(resolvedPaystackCode)
+				) {
+					// Stored code no longer exists on Paystack (env switch / deleted) — recreate
+					try {
+						const created = await this.paystack.createPlan({
+							name: nextName,
+							interval: nextInterval ?? "monthly",
+							amount: nextAmount,
+							currency: nextCurrency,
+							description: nextDescription,
+						});
+						resolvedPaystackCode =
+							created?.data?.plan_code ?? null;
+						if (!resolvedPaystackCode) {
+							throw new BadRequestException(
+								"Paystack did not return a plan code after recreate",
+							);
+						}
+					} catch (recreateError: any) {
+						throw new BadRequestException(
+							recreateError?.message ||
+								"Failed to recreate Paystack plan",
+						);
+					}
+				} else if (error instanceof BadRequestException) {
+					throw error;
+				} else {
+					throw new BadRequestException(message);
+				}
+			}
 		}
 
 		await this.subscriptionsRepo.updatePlan(id, {
@@ -503,9 +612,9 @@ export class AdminService {
 				: {}),
 			...(isPayg
 				? { paystackPlanCode: null }
-				: dto.paystackPlanCode !== undefined
-					? { paystackPlanCode: dto.paystackPlanCode }
-					: {}),
+				: {
+						paystackPlanCode: resolvedPaystackCode,
+					}),
 			...(dto.description !== undefined && {
 				description: dto.description,
 			}),
@@ -525,15 +634,25 @@ export class AdminService {
 			throw new NotFoundException("Subscription plan not found");
 		}
 
-		const subscriberCount =
-			await this.subscriptionsRepo.countSubscriptionsByPlanId(id);
-		if (subscriberCount > 0) {
+		const [subscriberCount, transactionCount, creditCount] =
+			await Promise.all([
+				this.subscriptionsRepo.countSubscriptionsByPlanId(id),
+				this.transactionsRepo.countByPlanId(id),
+				this.incidentCredits.count({ where: { planId: id } }),
+			]);
+
+		if (subscriberCount > 0 || transactionCount > 0 || creditCount > 0) {
 			await this.subscriptionsRepo.updatePlan(id, { active: false });
 			return {
 				message:
-					"Plan has existing subscribers, so it was deactivated instead of deleted",
+					"Plan has linked subscribers, payments, or credits, so it was deactivated instead of deleted",
 				id,
 				active: false,
+				linked: {
+					subscribers: subscriberCount,
+					transactions: transactionCount,
+					credits: creditCount,
+				},
 			};
 		}
 

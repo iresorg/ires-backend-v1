@@ -80,9 +80,12 @@ export class SubscriptionsService {
 			);
 		}
 
-		if (!plan.paystackPlanCode) {
+		if (
+			!plan.paystackPlanCode ||
+			!/^PLN_[A-Za-z0-9]+$/i.test(plan.paystackPlanCode.trim())
+		) {
 			throw new BadRequestException(
-				"Subscription plan is missing a Paystack plan code",
+				"Subscription plan has no valid Paystack plan code. An admin must re-save the plan to recreate it on Paystack.",
 			);
 		}
 
@@ -95,20 +98,32 @@ export class SubscriptionsService {
 		// Calculate amounts
 		const amountInKobo = plan.amount;
 
-		// Initialize transaction with Paystack
-		const paystackResponse = await this.paystack.initializeTransaction({
-			email: account.email,
-			amount: amountInKobo,
-			plan: plan.paystackPlanCode,
-			callback_url: dto.callbackUrl,
-			metadata: {
-				accountId,
-				planId: plan.id,
-				planName: plan.name,
-				type: "subscription",
-				paymentType: PlanPaymentType.SUBSCRIPTION,
-			},
-		});
+		let paystackResponse: any;
+		try {
+			paystackResponse = await this.paystack.initializeTransaction({
+				email: account.email,
+				amount: amountInKobo,
+				plan: plan.paystackPlanCode,
+				callback_url: dto.callbackUrl,
+				metadata: {
+					accountId,
+					planId: plan.id,
+					planName: plan.name,
+					type: "subscription",
+					paymentType: PlanPaymentType.SUBSCRIPTION,
+				},
+			});
+		} catch (error: any) {
+			const message =
+				typeof error?.message === "string"
+					? error.message
+					: "Failed to initialize subscription payment";
+			throw new BadRequestException(
+				/plan/i.test(message)
+					? `${message}. An admin should re-save the plan so a valid Paystack plan code is attached.`
+					: message,
+			);
+		}
 
 		await this.transactionsRepo.createTransaction({
 			accountId,
