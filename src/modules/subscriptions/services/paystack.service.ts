@@ -195,6 +195,32 @@ export class PaystackService {
 		}
 	}
 
+	async listTransactions(params?: {
+		perPage?: number;
+		page?: number;
+		from?: string;
+		to?: string;
+		status?: string;
+	}) {
+		try {
+			const response = await axios.get(`${this.baseURL}/transaction`, {
+				headers: this.getHeaders(),
+				params: {
+					perPage: params?.perPage ?? 100,
+					page: params?.page ?? 1,
+					from: params?.from,
+					to: params?.to,
+					status: params?.status,
+				},
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack list transactions error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
 	async listSettlements(params?: {
 		perPage?: number;
 		page?: number;

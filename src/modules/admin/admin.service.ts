@@ -543,6 +543,109 @@ export class AdminService {
 		const { from, to } = this.resolveDateRange(query.from, query.to);
 		const months = Math.min(Math.max(query.months ?? 6, 1), 24);
 
+		const local = await this.computeLocalFinancials(from, to, months);
+		const [mrrData, paygCreditsAvailable] = await Promise.all([
+			this.computeMrr(),
+			this.incidentCredits.count({
+				where: { status: IncidentCreditStatus.AVAILABLE },
+			}),
+		]);
+
+		let paystackPeriod: Awaited<
+			ReturnType<AdminService["fetchPaystackPeriodStats"]>
+		> | null = null;
+		let paystackError: string | null = null;
+
+		try {
+			paystackPeriod = await this.fetchPaystackPeriodStats(from, to);
+		} catch (error: any) {
+			paystackError =
+				error?.message || "Failed to fetch Paystack transactions";
+		}
+
+		const usePaystack =
+			paystackPeriod !== null &&
+			(paystackPeriod.successCount > 0 || local.revenueTotal === 0);
+
+		const revenueTotal = usePaystack
+			? paystackPeriod!.revenueTotal
+			: local.revenueTotal;
+		const revenueSubscription = usePaystack
+			? paystackPeriod!.revenueSubscription
+			: local.revenueSubscription;
+		const revenuePayg = usePaystack
+			? paystackPeriod!.revenuePayg
+			: local.revenuePayg;
+		const successCount = usePaystack
+			? paystackPeriod!.successCount
+			: local.successCount;
+		const failedCount = usePaystack
+			? paystackPeriod!.failedCount
+			: local.failedCount;
+		const pendingCount = usePaystack
+			? paystackPeriod!.pendingCount
+			: local.pendingCount;
+		const revenueByMonth = usePaystack
+			? this.buildMonthSeries(months).map((month) => {
+					const bucket = paystackPeriod!.byMonth.get(month) ?? {
+						subscription: 0,
+						payg: 0,
+						total: 0,
+					};
+					return { month, ...bucket };
+				})
+			: local.revenueByMonth;
+
+		const recentTransactions =
+			local.recentTransactions.length > 0
+				? local.recentTransactions
+				: (paystackPeriod?.recent ?? []);
+
+		return {
+			currency: "NGN",
+			range: { from, to },
+			revenueSource: usePaystack ? "paystack" : "local",
+			note: "Paystack balance is wallet cash (after fees, before/after settlements). Period revenue is successful charges in the selected range. They are not the same number.",
+			summary: {
+				revenueTotal,
+				revenueSubscription,
+				revenuePayg,
+				successCount,
+				failedCount,
+				pendingCount,
+				mrr: mrrData.mrr,
+				activeSubscribers: mrrData.activeSubscribers,
+				paygCreditsAvailable,
+			},
+			local: {
+				revenueTotal: local.revenueTotal,
+				revenueSubscription: local.revenueSubscription,
+				revenuePayg: local.revenuePayg,
+				successCount: local.successCount,
+				failedCount: local.failedCount,
+				pendingCount: local.pendingCount,
+			},
+			paystackPeriod: paystackPeriod
+				? {
+						revenueTotal: paystackPeriod.revenueTotal,
+						revenueSubscription: paystackPeriod.revenueSubscription,
+						revenuePayg: paystackPeriod.revenuePayg,
+						successCount: paystackPeriod.successCount,
+						failedCount: paystackPeriod.failedCount,
+						pendingCount: paystackPeriod.pendingCount,
+					}
+				: null,
+			paystackError,
+			revenueByMonth,
+			recentTransactions,
+		};
+	}
+
+	private async computeLocalFinancials(
+		from: Date,
+		to: Date,
+		months: number,
+	) {
 		const qb = this.transactions
 			.createQueryBuilder("tx")
 			.leftJoinAndSelect("tx.plan", "plan")
@@ -605,13 +708,6 @@ export class AdminService {
 			return { month, ...bucket };
 		});
 
-		const [mrrData, paygCreditsAvailable] = await Promise.all([
-			this.computeMrr(),
-			this.incidentCredits.count({
-				where: { status: IncidentCreditStatus.AVAILABLE },
-			}),
-		]);
-
 		const recent = await this.transactions.find({
 			relations: {
 				account: {
@@ -625,22 +721,148 @@ export class AdminService {
 		});
 
 		return {
-			currency: "NGN",
-			range: { from, to },
-			summary: {
-				revenueTotal,
-				revenueSubscription,
-				revenuePayg,
-				successCount,
-				failedCount,
-				pendingCount,
-				mrr: mrrData.mrr,
-				activeSubscribers: mrrData.activeSubscribers,
-				paygCreditsAvailable,
-			},
+			revenueTotal,
+			revenueSubscription,
+			revenuePayg,
+			successCount,
+			failedCount,
+			pendingCount,
 			revenueByMonth,
 			recentTransactions: recent.map((tx) => this.mapTransaction(tx)),
 		};
+	}
+
+	private async fetchPaystackPeriodStats(from: Date, to: Date) {
+		const fromStr = this.formatPaystackDate(from);
+		const toStr = this.formatPaystackDate(to);
+
+		let revenueTotal = 0;
+		let revenueSubscription = 0;
+		let revenuePayg = 0;
+		let successCount = 0;
+		let failedCount = 0;
+		let pendingCount = 0;
+		const byMonth = new Map<
+			string,
+			{ subscription: number; payg: number; total: number }
+		>();
+		const recent: Array<Record<string, unknown>> = [];
+
+		let page = 1;
+		const maxPages = 25;
+
+		while (page <= maxPages) {
+			const response = await this.paystack.listTransactions({
+				page,
+				perPage: 100,
+				from: fromStr,
+				to: toStr,
+			});
+			const rows: any[] = Array.isArray(response?.data)
+				? response.data
+				: [];
+			if (!rows.length) break;
+
+			for (const row of rows) {
+				const amount = this.toNumber(row.amount);
+				const status = String(row.status || "").toLowerCase();
+				const paymentType = this.resolvePaystackPaymentType(row);
+				const when = new Date(
+					row.paid_at || row.created_at || Date.now(),
+				);
+
+				if (status === "success") {
+					successCount += 1;
+					revenueTotal += amount;
+					if (paymentType === PlanPaymentType.ONE_TIME) {
+						revenuePayg += amount;
+					} else {
+						revenueSubscription += amount;
+					}
+
+					const key = this.monthKey(when);
+					const bucket = byMonth.get(key) ?? {
+						subscription: 0,
+						payg: 0,
+						total: 0,
+					};
+					if (paymentType === PlanPaymentType.ONE_TIME) {
+						bucket.payg += amount;
+					} else {
+						bucket.subscription += amount;
+					}
+					bucket.total += amount;
+					byMonth.set(key, bucket);
+
+					if (recent.length < 10) {
+						recent.push({
+							id: String(row.id),
+							reference: row.reference,
+							status: "success",
+							amount,
+							amountNaira: amount / 100,
+							currency: row.currency || "NGN",
+							paymentType,
+							paymentMethod:
+								row.authorization?.channel || "Paystack",
+							accountId: null,
+							accountEmail: row.customer?.email ?? null,
+							accountName:
+								[row.customer?.first_name, row.customer?.last_name]
+									.filter(Boolean)
+									.join(" ") || null,
+							planId: null,
+							planName: null,
+							subscriptionId: null,
+							createdAt: when,
+							source: "paystack",
+						});
+					}
+				} else if (status === "failed") {
+					failedCount += 1;
+				} else if (
+					status === "abandoned" ||
+					status === "ongoing" ||
+					status === "pending" ||
+					status === "processing"
+				) {
+					pendingCount += 1;
+				}
+			}
+
+			const pageCount = response?.meta?.pageCount;
+			if (pageCount && page >= pageCount) break;
+			if (rows.length < 100) break;
+			page += 1;
+		}
+
+		return {
+			revenueTotal,
+			revenueSubscription,
+			revenuePayg,
+			successCount,
+			failedCount,
+			pendingCount,
+			byMonth,
+			recent,
+		};
+	}
+
+	private resolvePaystackPaymentType(row: any): PlanPaymentType {
+		const meta = row?.metadata || {};
+		const metaType = meta.type ?? meta.paymentType;
+		if (
+			metaType === "payg" ||
+			metaType === "one_time" ||
+			metaType === PlanPaymentType.ONE_TIME
+		) {
+			return PlanPaymentType.ONE_TIME;
+		}
+		return PlanPaymentType.SUBSCRIPTION;
+	}
+
+	private formatPaystackDate(date: Date): string {
+		return date.toISOString().slice(0, 10);
 	}
 
 	async getFinancialsTransactions(query: FinancialsTransactionsQueryDto) {

@@ -19,10 +19,20 @@ Related: [`ADMIN_SUBSCRIPTION_PLANS.md`](./ADMIN_SUBSCRIPTION_PLANS.md), [`PUBLI
 
 | UI block | Source | Endpoint |
 |---|---|---|
-| Revenue, success/fail, PAYG vs sub, MRR, monthly chart | Local `subscription_transactions` + active subs | `GET /admin/financials/overview` |
-| Payment ledger / search | Local transactions | `GET /admin/financials/transactions` |
+| **Total revenue / PAYG vs sub / success counts / chart** | Prefer **live Paystack charges** in the selected date range (falls back to local DB) | `GET /admin/financials/overview` |
+| Local ledger only | `subscription_transactions` | nested `local` on overview + `GET /admin/financials/transactions` |
 | Wallet balance | **Live Paystack** | `GET /admin/financials/paystack/balance` |
 | Settlements (bank payouts) | **Live Paystack** | `GET /admin/financials/paystack/settlements` |
+
+### Why balance ≠ revenue
+
+| | |
+|---|---|
+| **Paystack balance** | Cash sitting in the Paystack wallet **now** (all time, minus fees/settlements) |
+| **Period revenue** | Successful **charges in the From→To range** |
+| **Local ledger** | Only payments our webhooks wrote to `subscription_transactions` |
+
+So you can see **₦2.2M balance** while **local revenue is ₦0** if charges never landed in our DB (webhook gaps, older payments, different environment). Overview now fills **Total Revenue** from Paystack period charges when local is empty.
 
 Refunds are **not** tracked yet.
 
@@ -47,6 +57,8 @@ GET /api/v1/admin/financials/overview?from=2026-01-01&to=2026-09-18&months=6
 {
   "currency": "NGN",
   "range": { "from": "…", "to": "…" },
+  "revenueSource": "paystack",
+  "note": "Paystack balance is wallet cash… Period revenue is successful charges in the selected range…",
   "summary": {
     "revenueTotal": 15000000,
     "revenueSubscription": 10000000,
@@ -58,6 +70,23 @@ GET /api/v1/admin/financials/overview?from=2026-01-01&to=2026-09-18&months=6
     "activeSubscribers": 8,
     "paygCreditsAvailable": 3
   },
+  "local": {
+    "revenueTotal": 0,
+    "revenueSubscription": 0,
+    "revenuePayg": 0,
+    "successCount": 0,
+    "failedCount": 0,
+    "pendingCount": 0
+  },
+  "paystackPeriod": {
+    "revenueTotal": 15000000,
+    "revenueSubscription": 10000000,
+    "revenuePayg": 5000000,
+    "successCount": 12,
+    "failedCount": 2,
+    "pendingCount": 1
+  },
+  "paystackError": null,
   "revenueByMonth": [
     {
       "month": "2026-04",
@@ -66,34 +95,18 @@ GET /api/v1/admin/financials/overview?from=2026-01-01&to=2026-09-18&months=6
       "total": 2500000
     }
   ],
-  "recentTransactions": [
-    {
-      "id": "uuid",
-      "reference": "ref_xxx",
-      "status": "success",
-      "amount": 5000000,
-      "amountNaira": 50000,
-      "currency": "NGN",
-      "paymentType": "subscription",
-      "paymentMethod": "card",
-      "accountId": "uuid",
-      "accountEmail": "customer@example.com",
-      "accountName": "Jane Doe",
-      "planId": "uuid",
-      "planName": "Basic Shield",
-      "subscriptionId": "uuid",
-      "createdAt": "…"
-    }
-  ]
+  "recentTransactions": []
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `revenue*` | Sum of **successful** charges in range (kobo) |
-| `mrr` | Approx monthly recurring = sum of active recurring plan amounts |
-| `paygCreditsAvailable` | Unused PAYG incident credits (all accounts) |
-| `paymentType` | `subscription` \| `one_time` |
+| `revenueSource` | `paystack` \| `local` — which source filled `summary.revenue*` |
+| `summary.revenue*` | Successful charges used for the UI cards (usually Paystack period) |
+| `local.*` | What we stored in our DB for the same range |
+| `paystackPeriod.*` | Live Paystack totals for the same range |
+| `mrr` | Approx monthly recurring from **local** active subscriptions |
+| `paygCreditsAvailable` | Unused PAYG credits in our DB |
 
 ### UI cards (suggested)
 
