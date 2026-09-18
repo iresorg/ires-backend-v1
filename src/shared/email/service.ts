@@ -200,19 +200,37 @@ export class EmailService {
 		await this.emailConsumer.publishEmailToQueue(payload);
 	}
 
-	async sendSubscriptionEndedEmail(
-		email: string,
-		userName: string,
-		planName: string,
+	async sendTicketStatusUpdateEmail(
+		emails: string | string[],
+		params: {
+			greetingName: string;
+			intro: string;
+			ticketId: string;
+			title: string;
+			status: string;
+			subject: string;
+			headerText?: string;
+			details?: string;
+			link?: string;
+		},
 	): Promise<void> {
-		const payload: EmailPayload<"SubscriptionEnded"> = {
-			to: [email],
+		const to = Array.isArray(emails) ? emails : [emails];
+		if (!to.length) return;
+
+		const payload: EmailPayload<"TicketStatusUpdate"> = {
+			to,
 			from: this.from,
-			subject: "Subscription Expired",
-			template: "SubscriptionEnded",
+			subject: params.subject,
+			template: "TicketStatusUpdate",
 			options: {
-				userName,
-				planName,
+				headerText: params.headerText ?? "Ticket Update",
+				greetingName: params.greetingName,
+				intro: params.intro,
+				ticketId: params.ticketId,
+				title: params.title,
+				status: params.status,
+				details: params.details,
+				link: params.link ?? "#",
 			},
 		};
 

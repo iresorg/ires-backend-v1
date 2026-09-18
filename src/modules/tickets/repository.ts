@@ -94,11 +94,11 @@ export class TicketsRepository {
 	}
 
 	async getTickets(
-		filter: Partial<{ status: TicketStatus }>,
+		filter: Partial<{ status: TicketStatus; accountId: string }>,
 		paginationQuery: Partial<PaginationQuery>,
 		trx?: TDatabaseTransaction
 	): Promise<PaginatedResponse<ITicketSummary>> {
-		const { status } = filter;
+		const { status, accountId } = filter;
 		const { limit = 10, page = 1 } = paginationQuery;
 		const offset = (page - 1) * limit;
 		const repo = this.getRepo(trx);
@@ -121,11 +121,17 @@ export class TicketsRepository {
 			])
 			.offset(offset)
 			.limit(limit)
-			.orderBy("ticket.createdAt", "DESC")
+			.orderBy("ticket.createdAt", "DESC");
 
-			if (status) {
-				query.where("ticket.status = :status", { status })
-			}
+		if (accountId) {
+			query.andWhere("ticket.created_for_account_id = :accountId", {
+				accountId,
+			});
+		}
+
+		if (status) {
+			query.andWhere("ticket.status = :status", { status });
+		}
 
 		const [tickets, total] = await query.getManyAndCount();
 		return {

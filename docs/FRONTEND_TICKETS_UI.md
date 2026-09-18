@@ -5,6 +5,8 @@ Work order matters: **categories / sub-categories first**, then ticket create / 
 Base URL: `{API}/api/v1`  
 Auth: `Authorization: Bearer <token>` on all ticket and category routes.
 
+**This doc = staff / admin app.** Customer portal ticket list/detail → [`PUBLIC_ACCOUNT_TICKETS.md`](./PUBLIC_ACCOUNT_TICKETS.md).
+
 ---
 
 ## Product model: createdBy vs createdFor
@@ -254,6 +256,7 @@ Optional: `subCategoryId`, `internalNotes`, `contactInformation`, `victimInforma
 - [ ] Disable submit when `eligible: false`; show `reason`
 - [ ] Category required; sub-category when parent has children
 - [ ] On success show `ticketId`, `createdBy`, `createdFor`, `entitlementSource`
+- [ ] On success, note that the customer is emailed and can see the ticket in their portal
 
 ---
 
@@ -328,6 +331,29 @@ Roles: `RESPONDER_ADMIN`, `SUPER_ADMIN`.
 
 ---
 
+## Email notifications (backend — no FE work)
+
+Staff actions trigger emails automatically. Admin UI does **not** need a “send email” control. Optionally show a subtle toast like “Customer / responder notified” after success.
+
+| Staff action | Customer (`createdFor`) | Assigned responder | Other |
+|---|---|---|---|
+| Create ticket | Yes — ticket opened | — | Responder admins get new-ticket alert |
+| Start analysis | Yes | — | — |
+| Assign | Yes | Yes — assigned to you | — |
+| Start responding | Yes | Yes | — |
+| Escalate | Yes | — | Responder admins get escalation alert |
+| Reassign | Yes | Yes — new assignee | Previous responder notified |
+| Resolve | Yes | Yes | — |
+| Close | Yes | Yes | — |
+
+UI copy tips:
+
+- On create success: customer receives a “ticket created” email; they can also see it under portal **My incidents** (`/accounts/tickets`).
+- On assign / reassign: both customer and responder get mail — no separate notify step.
+- Detail view can show `createdFor.email` so staff know who is being notified.
+
+---
+
 ## Suggested Linear / Jira ticket titles
 
 1. **[Tickets] Admin: category & sub-category CRUD** (blocker for create)
@@ -336,7 +362,8 @@ Roles: `RESPONDER_ADMIN`, `SUPER_ADMIN`.
 4. **[Tickets] Detail view + lifecycle timeline** (createdBy + createdFor + entitlementSource)
 5. **[Tickets] Responder actions**
 6. **[Tickets] Escalation history (admin)**
-7. **[Billing] PAYG pricing card + `initialize-payg` checkout**
+7. **[Portal] Account tickets dashboard** (see `PUBLIC_ACCOUNT_TICKETS.md`)
+8. **[Billing] PAYG pricing card + `initialize-payg` checkout**
 
 ---
 
@@ -354,4 +381,5 @@ Content-Type: multipart/form-data
 - `subCategoryId` = optional
 - `attachments` = files
 
-`createdBy` = staff from token. Eligibility + credit consumption happen server-side.
+`createdBy` = staff from token. Eligibility + credit consumption happen server-side.  
+On success the **customer** is emailed and can track the ticket in the account portal.
