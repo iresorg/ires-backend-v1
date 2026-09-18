@@ -34,7 +34,7 @@ import { Role } from "../users/enums/role.enum";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { GetTicketDto } from "./dto/get-ticket.dto";
-import { PaginatedResponse } from "@/shared/utils/pagination";
+import { EligibleAccountsQueryDto } from "./dto/eligible-accounts.dto";
 import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { FilesInterceptor } from "@nestjs/platform-express";
 
@@ -110,6 +110,20 @@ export class TicketsController {
 		return {
 			message: "Eligibility checked successfully",
 			data,
+		};
+	}
+
+	@ApiOperation({
+		summary:
+			"List customer accounts eligible for ticket create (active subscription with remaining incidents, or unused PAYG credit)",
+	})
+	@ApiResponse({ status: 200, description: "Eligible accounts fetched" })
+	@Get("eligible-accounts")
+	async getEligibleAccounts(@Query() query: EligibleAccountsQueryDto) {
+		const data = await this.ticketsService.getEligibleAccounts(query);
+		return {
+			message: "Eligible accounts fetched successfully",
+			...data,
 		};
 	}
 

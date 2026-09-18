@@ -35,14 +35,66 @@ A ticket may be created **for** an account only if that account:
    - has an **active subscription** with remaining `maxIncidents` in the current billing period, **or**
    - has a **paid, unused PAYG credit** in `incident_credits`
 
-Check before create:
+Check before create (single account):
 
 ```
 GET /api/v1/tickets/eligibility/:accountId
 Authorization: Bearer <staff-jwt>
 ```
 
-Response `data`:
+### Customer picker (eligible accounts only)
+
+Use this instead of `GET /admin/users` when creating a ticket — only accounts that can open an incident **right now**.
+
+```
+GET /api/v1/tickets/eligible-accounts?search=zeema&page=1&limit=10
+GET /api/v1/tickets/eligible-accounts?source=subscription
+GET /api/v1/tickets/eligible-accounts?source=payg
+```
+
+| Query | Notes |
+|---|---|
+| `search` | Name or email |
+| `page` / `limit` | Pagination (default page 1, limit 10) |
+| `source` | Optional `subscription` \| `payg` |
+
+**How incident usage is tracked**
+
+| Source | Tracked how |
+|---|---|
+| `subscription` | Count of tickets `createdFor` this account in the **current billing period** vs plan `maxIncidents` (`null` = unlimited) |
+| `payg` | Unused rows in `incident_credits` (`paygCreditsAvailable`) |
+| Lifetime | `ticketsCreatedTotal` = all tickets ever created for the account |
+
+Response `data` item:
+
+```json
+{
+  "accountId": "uuid",
+  "email": "customer@example.com",
+  "name": "Zeema Advisory Limited",
+  "role": "organization",
+  "status": "active",
+  "source": "subscription",
+  "subscription": {
+    "id": "uuid",
+    "planName": "Basic Shield",
+    "maxIncidents": 1,
+    "usedIncidents": 0,
+    "remainingIncidents": 1,
+    "currentPeriodStart": "…",
+    "currentPeriodEnd": "…"
+  },
+  "paygCreditsAvailable": 0,
+  "usedIncidentsThisPeriod": 0,
+  "remainingIncidentsThisPeriod": 1,
+  "ticketsCreatedTotal": 2
+}
+```
+
+`source` is which entitlement will be consumed on create (`subscription` preferred when both exist).
+
+Eligibility response `data` (single account):
 
 ```json
 {
@@ -303,9 +355,10 @@ Optional: `subCategoryId`, `internalNotes`, `contactInformation`, `victimInforma
 ### UI acceptance
 
 - [ ] Block create if categories empty → link to FE-1
-- [ ] Customer picker → call `GET /tickets/eligibility/:accountId` before submit
-- [ ] Show plan / remaining incidents / PAYG credits from eligibility
-- [ ] Disable submit when `eligible: false`; show `reason`
+- [ ] Customer picker → **`GET /tickets/eligible-accounts?search=`** (not all admin users)
+- [ ] Show plan / remaining incidents / PAYG credits from each row
+- [ ] Optional: confirm with `GET /tickets/eligibility/:accountId` before submit
+- [ ] Disable submit when nothing selected / ineligible
 - [ ] Category required; sub-category when parent has children
 - [ ] On success show `ticketId`, `createdBy`, `createdFor`, `entitlementSource`
 - [ ] On success, note that the customer is emailed and can see the ticket in their portal

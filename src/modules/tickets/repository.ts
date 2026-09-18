@@ -155,6 +155,16 @@ export class TicketsRepository {
 			.getCount();
 	}
 
+	async countTicketsForAccount(
+		accountId: string,
+		trx?: TDatabaseTransaction,
+	): Promise<number> {
+		const repo = this.getRepo(trx);
+		return repo.count({
+			where: { createdForAccountId: accountId },
+		});
+	}
+
 	async updateTicket(
 		ticketId: string,
 		updateBody: Partial<IUpdateTicket>,

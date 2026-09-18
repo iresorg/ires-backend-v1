@@ -107,6 +107,18 @@ export class SubscriptionsRepository {
 		});
 	}
 
+	async findActiveAccountIds(): Promise<string[]> {
+		const rows = await this.subscriptions
+			.createQueryBuilder("subscription")
+			.select("DISTINCT subscription.account_id", "accountId")
+			.where("subscription.status = :status", {
+				status: SubscriptionStatus.ACTIVE,
+			})
+			.getRawMany<{ accountId: string }>();
+
+		return rows.map((row) => row.accountId);
+	}
+
 	async findById(id: string): Promise<Subscription | null> {
 		return await this.subscriptions.findOne({
 			where: { id },

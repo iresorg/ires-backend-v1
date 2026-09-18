@@ -56,6 +56,18 @@ export class IncidentCreditsRepository {
 		});
 	}
 
+	async findAccountIdsWithAvailableCredits(): Promise<string[]> {
+		const rows = await this.credits
+			.createQueryBuilder("credit")
+			.select("DISTINCT credit.account_id", "accountId")
+			.where("credit.status = :status", {
+				status: IncidentCreditStatus.AVAILABLE,
+			})
+			.getRawMany<{ accountId: string }>();
+
+		return rows.map((row) => row.accountId);
+	}
+
 	async consumeCredit(
 		creditId: string,
 		ticketId: string,

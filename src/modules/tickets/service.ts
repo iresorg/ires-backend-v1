@@ -23,7 +23,7 @@ import {
 } from "@/shared/database/datasource";
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { AssignResponder, ReassignTicket } from "./types";
-import { PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
+import { PaginatedResponse, PaginationQuery, getPaginationMeta } from "@/shared/utils/pagination";
 import { FileUploadService } from "../file-upload/service";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import { SubscriptionsRepository } from "@/modules/subscriptions/repository/subscriptions.repository";
@@ -48,6 +48,23 @@ export type TicketEligibility = {
 	} | null;
 	paygCreditsAvailable: number;
 	reason?: string;
+};
+
+export type EligibleAccountRow = {
+	accountId: string;
+	email: string;
+	name: string;
+	role: string;
+	status: string;
+	source: TicketEntitlementSource;
+	subscription: TicketEligibility["subscription"];
+	paygCreditsAvailable: number;
+	/** Tickets created for this account in the current subscription period (0 if PAYG-only). */
+	usedIncidentsThisPeriod: number;
+	/** Remaining subscription incidents this period; null = unlimited; 0 if using PAYG only. */
+	remainingIncidentsThisPeriod: number | null;
+	/** Lifetime tickets created for this account. */
+	ticketsCreatedTotal: number;
 };
 
 @Injectable()
@@ -170,6 +187,80 @@ export class TicketsService {
 			paygCreditsAvailable: 0,
 			reason:
 				"No active subscription or unused pay-as-you-go credit",
+		};
+	}
+
+	async getEligibleAccounts(query: {
+		search?: string;
+		source?: TicketEntitlementSource;
+		page?: number;
+		limit?: number;
+	}): Promise<PaginatedResponse<EligibleAccountRow>> {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+
+		const [subscriptionAccountIds, paygAccountIds] = await Promise.all([
+			query.source === TicketEntitlementSource.PAYG
+				? Promise.resolve([] as string[])
+				: this.subscriptionsRepo.findActiveAccountIds(),
+			query.source === TicketEntitlementSource.SUBSCRIPTION
+				? Promise.resolve([] as string[])
+				: this.incidentCreditsRepo.findAccountIdsWithAvailableCredits(),
+		]);
+
+		const candidateIds = [
+			...new Set([...subscriptionAccountIds, ...paygAccountIds]),
+		];
+
+		if (!candidateIds.length) {
+			return {
+				data: [],
+				pagination: getPaginationMeta(0, page, limit),
+			};
+		}
+
+		const accounts = await this.accountsRepo.findByIdsWithFilters({
+			ids: candidateIds,
+			search: query.search,
+		});
+
+		const rows: EligibleAccountRow[] = [];
+
+		for (const account of accounts) {
+			const [eligibility, ticketsCreatedTotal] = await Promise.all([
+				this.getAccountEligibility(account.id),
+				this.ticketsRepository.countTicketsForAccount(account.id),
+			]);
+
+			if (!eligibility.eligible || !eligibility.source) continue;
+			if (query.source && eligibility.source !== query.source) continue;
+
+			rows.push({
+				accountId: account.id,
+				email: account.email,
+				name: this.accountDisplayName(account),
+				role: account.role,
+				status: account.status,
+				source: eligibility.source,
+				subscription: eligibility.subscription,
+				paygCreditsAvailable: eligibility.paygCreditsAvailable,
+				usedIncidentsThisPeriod:
+					eligibility.subscription?.usedIncidents ?? 0,
+				remainingIncidentsThisPeriod:
+					eligibility.source === TicketEntitlementSource.SUBSCRIPTION
+						? (eligibility.subscription?.remainingIncidents ?? null)
+						: eligibility.paygCreditsAvailable,
+				ticketsCreatedTotal,
+			});
+		}
+
+		const total = rows.length;
+		const offset = (page - 1) * limit;
+		const data = rows.slice(offset, offset + limit);
+
+		return {
+			data,
+			pagination: getPaginationMeta(total, page, limit),
 		};
 	}
 
@@ -670,6 +761,19 @@ export class TicketsService {
 	private accountGreetingName(account: Account): string {
 		if (account.individualProfile?.firstName) {
 			return account.individualProfile.firstName;
+		}
+		if (account.organizationProfile?.organizationName) {
+			return account.organizationProfile.organizationName;
+		}
+		return account.email;
+	}
+
+	private accountDisplayName(account: Account): string {
+		if (account.individualProfile?.firstName) {
+			const last = account.individualProfile.lastName?.trim();
+			return last
+				? `${account.individualProfile.firstName} ${last}`
+				: account.individualProfile.firstName;
 		}
 		if (account.organizationProfile?.organizationName) {
 			return account.organizationProfile.organizationName;

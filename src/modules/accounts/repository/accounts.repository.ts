@@ -114,6 +114,33 @@ export class AccountsRepository {
 		);
 	}
 
+	async findByIdsWithFilters(options: {
+		ids: string[];
+		search?: string;
+	}): Promise<Account[]> {
+		if (!options.ids.length) return [];
+
+		const queryBuilder = this.accounts
+			.createQueryBuilder("account")
+			.leftJoinAndSelect("account.individualProfile", "individualProfile")
+			.leftJoinAndSelect(
+				"account.organizationProfile",
+				"organizationProfile",
+			)
+			.where("account.id IN (:...ids)", { ids: options.ids });
+
+		if (options.search?.trim()) {
+			const searchTerm = `%${options.search.toLowerCase().trim()}%`;
+			queryBuilder.andWhere(
+				"(LOWER(account.email) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
+				{ search: searchTerm },
+			);
+		}
+
+		queryBuilder.orderBy("account.createdAt", "DESC");
+		return queryBuilder.getMany();
+	}
+
 	async findAllWithFilters(options: {
 		search?: string;
 		role?: "individual" | "organization";
