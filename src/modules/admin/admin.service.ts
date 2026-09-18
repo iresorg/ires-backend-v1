@@ -11,6 +11,10 @@ import {
 	Subscription,
 	SubscriptionStatus,
 } from "../subscriptions/entities/subscription.entity";
+import {
+	IncidentCredit,
+	IncidentCreditStatus,
+} from "../subscriptions/entities/incident-credit.entity";
 import { UsersQueryDto } from "./dto/users-query.dto";
 import { SubscribersQueryDto } from "./dto/subscribers-query.dto";
 import { UserResponseDto } from "./dto/user-response.dto";
@@ -42,6 +46,8 @@ export class AdminService {
 		private readonly accountsRepo: AccountsRepository,
 		@InjectRepository(Subscription)
 		private readonly subscriptions: Repository<Subscription>,
+		@InjectRepository(IncidentCredit)
+		private readonly incidentCredits: Repository<IncidentCredit>,
 		@InjectRepository(User)
 		private readonly users: Repository<User>,
 		@InjectRepository(Account)
@@ -92,11 +98,13 @@ export class AdminService {
 		subscribers: SubscriberResponseDto[];
 		total: number;
 	}> {
-		const { search, status, planId, page, limit } = query;
+		if (query.paymentType === PlanPaymentType.ONE_TIME) {
+			return this.getPaygSubscribers(query);
+		}
 
+		const { search, status, planId, page, limit } = query;
 		const offset = page && limit ? (page - 1) * limit : undefined;
 
-		// Query subscriptions directly with account relations
 		const queryBuilder = this.subscriptions
 			.createQueryBuilder("subscription")
 			.leftJoinAndSelect("subscription.account", "account")
@@ -105,47 +113,29 @@ export class AdminService {
 				"account.organizationProfile",
 				"organizationProfile",
 			)
-			.leftJoinAndSelect("subscription.plan", "plan");
+			.leftJoinAndSelect("subscription.plan", "plan")
+			.andWhere("plan.payment_type = :paymentType", {
+				paymentType: PlanPaymentType.SUBSCRIPTION,
+			});
 
-		// Search by name or email
 		if (search) {
 			const searchTerm = `%${search.toLowerCase()}%`;
-			queryBuilder.where(
+			queryBuilder.andWhere(
 				"(LOWER(account.email) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
 				{ search: searchTerm },
 			);
 		}
 
-		// Filter by subscription status
 		if (status) {
-			if (search) {
-				queryBuilder.andWhere("subscription.status = :status", {
-					status,
-				});
-			} else {
-				queryBuilder.where("subscription.status = :status", {
-					status,
-				});
-			}
+			queryBuilder.andWhere("subscription.status = :status", { status });
 		}
 
-		// Filter by plan
 		if (planId) {
-			if (search || status) {
-				queryBuilder.andWhere("subscription.planId = :planId", {
-					planId,
-				});
-			} else {
-				queryBuilder.where("subscription.planId = :planId", {
-					planId,
-				});
-			}
+			queryBuilder.andWhere("subscription.planId = :planId", { planId });
 		}
 
-		// Get total count before applying pagination
 		const total = await queryBuilder.getCount();
 
-		// Apply pagination
 		if (limit !== undefined) {
 			queryBuilder.take(limit);
 		}
@@ -153,11 +143,9 @@ export class AdminService {
 			queryBuilder.skip(offset);
 		}
 
-		// Order by createdAt (property name, not column name)
 		queryBuilder.orderBy("subscription.createdAt", "DESC");
 
 		const subscriptions = await queryBuilder.getMany();
-
 		const subscribersData = subscriptions.map((subscription) => ({
 			account: subscription.account,
 			subscription,
@@ -168,6 +156,79 @@ export class AdminService {
 				SubscriberResponseDto.fromAccountsWithSubscriptions(
 					subscribersData,
 				),
+			total,
+		};
+	}
+
+	private async getPaygSubscribers(query: SubscribersQueryDto): Promise<{
+		subscribers: SubscriberResponseDto[];
+		total: number;
+	}> {
+		const { search, planId, page, limit } = query;
+		const offset = page && limit ? (page - 1) * limit : undefined;
+
+		const qb = this.incidentCredits
+			.createQueryBuilder("credit")
+			.innerJoinAndSelect("credit.account", "account")
+			.leftJoinAndSelect("account.individualProfile", "individualProfile")
+			.leftJoinAndSelect(
+				"account.organizationProfile",
+				"organizationProfile",
+			)
+			.leftJoinAndSelect("credit.plan", "plan")
+			.distinctOn(["credit.account_id"])
+			.orderBy("credit.account_id")
+			.addOrderBy("credit.createdAt", "DESC");
+
+		if (search) {
+			const searchTerm = `%${search.toLowerCase()}%`;
+			qb.andWhere(
+				"(LOWER(account.email) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
+				{ search: searchTerm },
+			);
+		}
+
+		if (planId) {
+			qb.andWhere("credit.plan_id = :planId", { planId });
+		}
+
+		const allMatching = await qb.getMany();
+		const total = allMatching.length;
+		const pageRows =
+			limit !== undefined
+				? allMatching.slice(offset ?? 0, (offset ?? 0) + limit)
+				: allMatching;
+
+		const accountIds = pageRows.map((c) => c.accountId);
+		const availableCounts =
+			accountIds.length === 0
+				? []
+				: await this.incidentCredits
+						.createQueryBuilder("credit")
+						.select("credit.account_id", "accountId")
+						.addSelect("COUNT(*)", "count")
+						.where("credit.account_id IN (:...accountIds)", {
+							accountIds,
+						})
+						.andWhere("credit.status = :status", {
+							status: IncidentCreditStatus.AVAILABLE,
+						})
+						.groupBy("credit.account_id")
+						.getRawMany<{ accountId: string; count: string }>();
+
+		const availableMap = new Map(
+			availableCounts.map((row) => [row.accountId, Number(row.count)]),
+		);
+
+		return {
+			subscribers: pageRows.map((credit) =>
+				SubscriberResponseDto.fromAccountWithPaygCredit({
+					account: credit.account,
+					plan: credit.plan,
+					credit,
+					creditsAvailable: availableMap.get(credit.accountId) ?? 0,
+				}),
+			),
 			total,
 		};
 	}

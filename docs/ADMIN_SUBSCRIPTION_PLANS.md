@@ -34,6 +34,8 @@ When the admin types ₦50,000, send `5000000`.
 
 ## 1. Public plans (user-facing)
 
+**Customer pricing + account billing:** [`PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md`](./PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md)
+
 For pricing pages and checkout. Returns **active plans only**.
 
 No admin token required.
@@ -319,13 +321,18 @@ In the UI: confirm delete. If the response has `active: false`, tell the admin i
 ## Suggested admin screens
 
 1. **Plans table**
-   - Columns: name, account type, tier, price (₦), interval, active, actions
-   - Filters: Individual / Organization / All
+   - Columns: name, account type, **payment type**, tier, price (₦), interval, active, actions
+   - Filters: Individual / Organization / All × Subscription / Pay as you go
    - Toggle `active` via PATCH
-2. **Create / edit form**
-   - Name, account type (select), tier (number)
+2. **Subscribers table** (`GET /admin/subscribers`)
+   - Columns: name, email, role, plan, **paymentType**, amount, status, dates
+   - Filter `?paymentType=subscription` (default recurring list)
+   - Filter `?paymentType=one_time` for PAYG customers (`paygCreditsAvailable` shown)
+   - Example row fields: `paymentType`, `planId`, `interval`, `paygCreditsAvailable`
+3. **Create / edit form**
+   - Name, account type (select), **payment type** (subscription | one_time), tier (number)
    - Price input in **naira**, convert to kobo on submit (`naira * 100`)
-   - Currency default NGN, interval default monthly
+   - Currency default NGN; interval only when payment type is subscription
    - Description textarea
    - **Features (important):** do not use a raw textarea or one big text box.
      - Render each feature as a **chip / tag**
@@ -337,9 +344,58 @@ In the UI: confirm delete. If the response has `active: false`, tell the admin i
      - Empty list is allowed (`[]`), but the UI should make it easy to add several quickly
    - Max incidents: number or “Unlimited”
    - Active checkbox
-3. **Do not** ask the admin for a Paystack plan code on create
+4. **Do not** ask the admin for a Paystack plan code on create
 
 On **public plan cards**, show `features` the same way: a list of chips or compact check-rows, not a paragraph.
+
+### Admin subscribers API
+
+```
+GET /api/v1/admin/subscribers
+GET /api/v1/admin/subscribers?paymentType=subscription
+GET /api/v1/admin/subscribers?paymentType=one_time
+GET /api/v1/admin/subscribers?status=active&page=1&limit=10
+```
+
+Example recurring row:
+
+```json
+{
+  "id": "account-uuid",
+  "userName": "Jane Doe",
+  "email": "jane@example.com",
+  "role": "individual",
+  "planId": "plan-uuid",
+  "planSubscribedTo": "Basic Shield",
+  "paymentType": "subscription",
+  "interval": "monthly",
+  "amount": 5000000,
+  "startDate": "2026-09-01T00:00:00.000Z",
+  "endDate": "2026-10-01T00:00:00.000Z",
+  "status": "active",
+  "paygCreditsAvailable": null
+}
+```
+
+Example PAYG row (`paymentType=one_time`):
+
+```json
+{
+  "id": "account-uuid",
+  "userName": "Jane Doe",
+  "email": "jane@example.com",
+  "role": "individual",
+  "planId": "plan-uuid",
+  "planSubscribedTo": "Pay As You Go",
+  "paymentType": "one_time",
+  "interval": null,
+  "amount": 2500000,
+  "startDate": "2026-09-18T00:00:00.000Z",
+  "endDate": null,
+  "status": "available",
+  "paygCreditsAvailable": 1
+}
+```
 
 ---
 

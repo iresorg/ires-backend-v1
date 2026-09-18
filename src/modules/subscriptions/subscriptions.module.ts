@@ -13,6 +13,7 @@ import { SubscriptionPlan } from "./entities/subscription-plan.entity";
 import { PaystackEvent } from "./entities/paystack-event.entity";
 import { SubscriptionTransaction } from "./entities/transaction.entity";
 import { IncidentCredit } from "./entities/incident-credit.entity";
+import { Tickets } from "../tickets/entities/ticket.entity";
 import { AccountsModule } from "../accounts/accounts.module";
 import { EmailModule } from "@/shared/email/module";
 
@@ -24,6 +25,7 @@ import { EmailModule } from "@/shared/email/module";
 			PaystackEvent,
 			SubscriptionTransaction,
 			IncidentCredit,
+			Tickets,
 		]),
 		AccountsModule,
 		EmailModule,

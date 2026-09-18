@@ -1,657 +1,553 @@
-# 🔐 Subscription & Payment Flow Documentation
+# Subscription & Payment Flow Documentation
 
 ## Overview
 
-Implementation of recurring subscriptions using Paystack, supporting both Individual and Organization plans with automatic monthly billing.
+Billing covers two product types, both stored in `subscription_plans` and distinguished by **`paymentType`**:
+
+| `paymentType` | Meaning | Paystack | Entitlement |
+|---|---|---|---|
+| `subscription` | Recurring monthly plan | Paystack Plan + Subscription | Active row in `subscriptions` + incident limits per period |
+| `one_time` | Pay as you go | One-time charge only (no Paystack plan) | Row(s) in `incident_credits` |
+
+Account types: **`individual`** | **`organization`**.
+
+Base URL: `{API}/api/v1`  
+Related UI docs: [`PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md`](./PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md), [`ADMIN_SUBSCRIPTION_PLANS.md`](./ADMIN_SUBSCRIPTION_PLANS.md), [`FRONTEND_TICKETS_UI.md`](./FRONTEND_TICKETS_UI.md)
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-1. [Paystack Setup](#paystack-setup)
-2. [Database Architecture](#database-architecture)
-3. [Subscription Flow](#subscription-flow)
-4. [API Endpoints](#api-endpoints)
-5. [Webhook Events](#webhook-events)
-6. [Testing Guide](#testing-guide)
+1. [Paystack Setup](#1-paystack-setup)
+2. [Database Architecture](#2-database-architecture)
+3. [Payment Flows](#3-payment-flows)
+4. [API Endpoints](#4-api-endpoints)
+5. [Webhook Events](#5-webhook-events)
+6. [Testing Guide](#6-testing-guide)
+7. [File Structure](#7-file-structure)
+8. [Security](#8-security)
+9. [Environment Variables](#9-environment-variables)
 
 ---
 
 ## 1. Paystack Setup
 
-### Step 1: Create Paystack Account
+### Step 1: Account & keys
 
 1. Go to [dashboard.paystack.com](https://dashboard.paystack.com)
-2. Sign up/Login
-3. Complete business verification
+2. **Settings → API Keys & Webhooks**
+3. Copy:
+   - Test/Live **Secret Key** (`sk_test_` / `sk_live_`)
+   - Test/Live **Public Key** (`pk_test_` / `pk_live_`)
 
-### Step 2: Get API Keys
+### Step 2: Plans — how they are created now
 
-1. Navigate to **Settings** → **API Keys & Webhooks**
-2. Get your:
-   - **Test Secret Key** (starts with `sk_test_`)
-   - **Live Secret Key** (starts with `sk_live_`)
-   - **Public Key** (starts with `pk_test_` or `pk_live_`)
+**Preferred:** create plans via **admin API** (backend creates the Paystack plan for subscriptions).
 
-### Step 3: Create Subscription Plans in Paystack Dashboard
+```
+POST /api/v1/admin/subscription-plans
+Authorization: Bearer {staff_jwt}
+```
 
-For **each** subscription tier, create a plan:
+- `paymentType: "subscription"` → backend creates a Paystack plan and stores `paystackPlanCode`
+- `paymentType: "one_time"` → **no** Paystack plan; `paystackPlanCode` stays `null`
 
-#### For Individuals
+You can still create subscription plans manually in Paystack and paste `paystackPlanCode`, but admin auto-create is the normal path.
 
-1. **Tier 1: Essential Protection** - ₦15,000/month
-2. **Tier 2: Advanced Security** - ₦30,000/month
-3. **Tier 3: Premium Defense** - ₦50,000/month
+### Step 3: Webhooks
 
-#### For Organizations
+1. **Settings → Webhooks → Add Webhook URL**
+2. URL:
 
-1. **Tier 1: Business Shield** - ₦80,000/month
-2. **Tier 2: Enterprise Guard** - ₦250,000/month
-3. **Tier 3: Corporate Fortress** - ₦500,000/month
+```
+https://your-domain.com/api/v1/webhooks/paystack
+```
 
-**How to create in Paystack:**
+3. Listen for at least:
 
-1. Go to **Settings** → **Subscriptions & Plans** → **Create Plan**
-2. Enter:
-   - **Name**: e.g., "Essential Protection"
-   - **Amount**: 1500000 (kobo) = ₦15,000
-   - **Interval**: "Monthly"
-   - **Currency**: NGN
-   - **Send Email Invoice**: Yes
-3. Click **Create**
-4. Copy the **Plan Code** (e.g., `PLN_xxxxxxxxx`)
+- `subscription.create`
+- `subscription.disable`
+- `subscription.enable`
+- `invoice.create`
+- `invoice.payment_failed`
+- `charge.success`
+- `charge.failed`
 
-**Note:** Create **6 plans in total** (3 for individuals, 3 for organizations)
-
-### Step 4: Configure Webhooks
-
-1. Go to **Settings** → **Webhooks**
-2. Click **Add Webhook URL**
-3. Enter: `https://your-domain.com/api/subscriptions/webhook`
-4. Select events to listen to:
-   - ✅ `subscription.create`
-   - ✅ `subscription.disable`
-   - ✅ `subscription.enable`
-   - ✅ `invoice.create`
-   - ✅ `invoice.payment_failed`
-   - ✅ `charge.success`
-   - ✅ `charge.failed`
-5. Save
-
-### Step 5: Environment Variables
-
-Add to your `.env`:
+### Step 4: Environment
 
 ```env
-# Paystack Configuration
 PAYSTACK_SECRET_KEY=sk_test_your_test_secret_key
 PAYSTACK_PUBLIC_KEY=pk_test_your_test_public_key
-
-# For Production (later)
-# PAYSTACK_SECRET_KEY=sk_live_your_live_secret_key
-# PAYSTACK_PUBLIC_KEY=pk_live_your_live_public_key
-
-# Webhook Secret (for verifying webhook authenticity)
-# This is optional but recommended for production
+# Optional extra layer for production
 PAYSTACK_WEBHOOK_SECRET=your_webhook_secret
 ```
 
-**Note on Webhook Secret**: For local testing, you can skip this. Paystack sends webhooks with a signature in the `x-paystack-signature` header that you can verify using your secret key. The webhook secret is an additional security layer you can set up later for production.
+Signature verification uses the Paystack secret key on the `x-paystack-signature` header.
 
 ---
 
 ## 2. Database Architecture
 
-### Entity 1: `subscription_plans`
+### Entity: `subscription_plans`
 
-Stores all available subscription plans (6 total).
+Catalog for **both** recurring and one-time products.
 
 ```typescript
 {
   id: UUID;
-  name: string; // "Essential Protection"
-  tier: number; // 1, 2, 3
+  name: string;
+  tier: number; // ranking / display order (0 allowed for PAYG)
   accountType: "individual" | "organization";
-  amount: number; // 1500000 (kobo)
+  paymentType: "subscription" | "one_time";
+  amount: number; // kobo
   currency: "NGN";
-  interval: "monthly";
-  paystackPlanCode: string; // "PLN_xxxxxxxxx"
+  interval: string | null; // e.g. "monthly" for subscriptions; null for one_time
+  paystackPlanCode: string | null; // required path for subscriptions; null for one_time
   description: string;
-  features: JSON; // Array of features
-  maxIncidents: number | null; // How many incidents per month allowed (null = unlimited)
+  features: string[];
+  maxIncidents: number | null; // null = unlimited (subscriptions); one_time usually 1
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 ```
 
-### Entity 2: `subscriptions`
+### Entity: `subscriptions`
 
-Tracks user subscriptions and renewal status.
+Recurring entitlements only (`paymentType = subscription`).
 
 ```typescript
 {
   id: UUID;
-  accountId: UUID; // FK to accounts
-  planId: UUID; // FK to subscription_plans
-  paystackCustomerCode: string; // Customer code from Paystack
-  paystackSubscriptionCode: string; // Subscription code from Paystack
+  accountId: UUID;
+  planId: UUID;
+  paystackCustomerCode: string | null;
+  paystackSubscriptionCode: string | null;
+  paystackEmailToken: string | null;
   status: "active" | "expired" | "cancelled" | "past_due";
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   nextBillingDate: Date;
   cancelAtPeriodEnd: boolean;
   cancelledAt: Date | null;
-  metadata: JSON; // Additional info
+  metadata: JSON | null;
   createdAt: Date;
   updatedAt: Date;
 }
 ```
 
-**Subscription Status Explanation:**
+**Status**
 
-- **`active`**: Subscription is paid and active, user has full access
-- **`past_due`**: Payment failed/retry pending. User still has access during grace period, but renewal is in jeopardy
-- **`expired`**: Subscription period ended and no longer active (after grace period)
-- **`cancelled`**: User cancelled subscription, will expire at period end
+| Status | Meaning |
+|---|---|
+| `active` | Paid and in good standing |
+| `past_due` | Payment failed / retry pending; grace period |
+| `expired` | Period ended, no longer active |
+| `cancelled` | User cancelled; access until period end if `cancelAtPeriodEnd` |
 
-**Why `past_due` exists:**
-Payment failures occur for reasons like insufficient funds or expired cards. `past_due` provides a grace period where:
+### Entity: `subscription_transactions`
 
-- User retains access
-- Paystack attempts to retry the payment
-- Organization can notify the user to update payment details
-- If fixed, status becomes `active`; otherwise it becomes `expired`
-
-### Entity 3: `paystack_events` (Optional but Recommended)
-
-Log all webhook events for debugging.
+Payment records for subscription renewals **and** PAYG one-time charges.
 
 ```typescript
 {
   id: UUID;
-  eventType: string; // "subscription.create"
-  reference: string;
-  paystackEventId: string;
-  data: JSON; // Full event payload
-  processed: boolean;
-  processedAt: Date | null;
-  createdAt: Date;
+  accountId: UUID;
+  subscriptionId: UUID | null; // null for PAYG
+  planId: UUID | null;
+  transactionReference: string;
+  status: "success" | "failed" | "pending";
+  amount: number; // kobo
+  currency: string;
+  paymentMethod: string;
+  paystackCustomerCode: string | null;
+  metadata: JSON | null; // e.g. { type: "payg", paymentType: "one_time" }
 }
 ```
+
+### Entity: `incident_credits`
+
+PAYG entitlement. Created on successful one-time payment; consumed when a ticket is created for that account.
+
+```typescript
+{
+  id: UUID;
+  accountId: UUID;
+  planId: UUID | null;
+  transactionId: UUID | null;
+  incidentsGranted: number; // usually 1
+  incidentsUsed: number;
+  status: "available" | "used" | "expired";
+  ticketId: string | null;
+  metadata: JSON | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Entity: `paystack_events`
+
+Webhook audit log (idempotency / debugging).
 
 ---
 
-## 3. Subscription Flow
+## 3. Payment Flows
 
-### 3.1 User Initiates Subscription
-
-```
-Frontend → Backend
-POST /api/subscriptions/initialize
-{
-  "planId": "uuid",
-  "callbackUrl": "https://your-app.com/subscription/success"
-}
-
-Backend → Paystack
-POST https://api.paystack.co/transaction/initialize
-{
-  "email": user.email,
-  "amount": 1500000,
-  "plan": "PLN_xxxxxxxxx",
-  "callback_url": "callbackUrl",
-  "metadata": {
-    "accountId": user.id,
-    "planId": "uuid"
-  }
-}
-
-Paystack → Backend
-Returns: {
-  "authorization_url": "https://paystack.com/pay/xxxxx",
-  "access_code": "xxxxx",
-  "reference": "xxxxx"
-}
-
-Backend → Frontend
-Returns authorization_url for redirect
-```
-
-### 3.2 Payment Verification
+### 3.1 Recurring subscription
 
 ```
-User completes payment on Paystack
-↓
-Paystack redirects to callbackUrl with reference
-↓
-Frontend: GET /api/subscriptions/verify?reference=xxxxx
-↓
-Backend verifies with Paystack:
-GET https://api.paystack.co/transaction/verify/:reference
-↓
-If successful:
-- Create customer in Paystack (if not exists)
-- Create subscription in Paystack
-- Store subscription in database
-- Update account record
+Frontend → POST /api/v1/subscriptions/initialize
+  { planId, callbackUrl }
+  Auth: account JWT (AccountsAuthGuard)
+
+Backend checks:
+  - plan.paymentType === "subscription"
+  - plan has paystackPlanCode
+  - account has no active subscription
+
+Backend → Paystack transaction/initialize
+  { email, amount, plan: PLN_xxx, metadata: { type: "subscription", accountId, planId } }
+
+Frontend redirects to authorizationUrl
+User pays
+Paystack webhooks:
+  - charge.success → extend/activate subscription period + transaction row
+  - subscription.create → attach subscription_code / email_token
 ```
 
-### 3.3 Webhook Events
+Ticket eligibility from subscription: count tickets for the account in `currentPeriodStart`…`currentPeriodEnd` vs `plan.maxIncidents`.
+
+### 3.2 Pay as you go (one-time)
 
 ```
-Paystack → Backend
-POST /api/subscriptions/webhook
-{
-  "event": "subscription.create|disable|enable|invoice.create|etc",
-  "data": {...}
-}
+Frontend → POST /api/v1/subscriptions/initialize-payg
+  { planId, callbackUrl }
+  Auth: account JWT
 
-Backend:
-1. Verify webhook signature
-2. Log event to paystack_events table
-3. Update subscription status
-4. Handle lifecycle events
+Backend checks:
+  - plan.paymentType === "one_time"
+  - plan.active
+
+Backend → Paystack transaction/initialize
+  NO plan code
+  metadata: { type: "payg", paymentType: "one_time", accountId, planId, incidentsGranted }
+
+Creates pending subscription_transactions row
+
+On charge.success (metadata.type === "payg"):
+  - mark transaction success
+  - create incident_credits (status: available)
+  - does NOT create a subscriptions row
 ```
 
-### 3.4 Monthly Renewal (Automatic)
+Ticket create consumes one available credit.
+
+### 3.3 Monthly renewal (subscriptions only)
 
 ```
-Every Month:
-1. Paystack charges user's saved card
-2. Sends webhook: invoice.create → charge.success
-3. Backend updates subscription dates
-4. If payment fails → sends webhook: invoice.payment_failed
-5. Backend marks subscription as past_due
+Paystack charges saved card
+→ charge.success / invoice events
+→ backend updates period dates, status active
+→ on failure → past_due + notify
 ```
 
 ---
 
 ## 4. API Endpoints
 
-### Public Endpoints
+All paths below are under **`/api/v1`**.
 
-#### 1. Get Available Plans
+### Public
+
+#### Get plans (active only)
 
 ```
-GET /api/subscriptions/plans
+GET /subscriptions/plans
+GET /subscriptions/plans?accountType=individual
+GET /subscriptions/plans?accountType=organization
+GET /subscriptions/plans?paymentType=subscription
+GET /subscriptions/plans?paymentType=one_time
+GET /subscriptions/plans?accountType=individual&paymentType=one_time
+```
 
-Query Params:
-- accountType (optional): 'individual' | 'organization'
+| Query | Values |
+|---|---|
+| `accountType` | `individual` \| `organization` |
+| `paymentType` | `subscription` \| `one_time` |
 
-Response:
+Response: **array** of plans (not wrapped). Includes `paymentType`. Does **not** include `paystackPlanCode`.
+
+### Account-protected (`AccountsAuthGuard` — portal account JWT)
+
+#### Initialize subscription
+
+```
+POST /subscriptions/initialize
+Authorization: Bearer {account_jwt}
+
 {
-  "data": [
-    {
+  "planId": "uuid",
+  "callbackUrl": "https://your-app.com/subscription/success"
+}
+```
+
+```json
+{
+  "authorizationUrl": "https://paystack.com/pay/xxxxx",
+  "reference": "xxxxx",
+  "accessCode": "xxxxx"
+}
+```
+
+Rejects `one_time` plans (use `initialize-payg`).
+
+#### Initialize pay-as-you-go
+
+```
+POST /subscriptions/initialize-payg
+Authorization: Bearer {account_jwt}
+
+{
+  "planId": "uuid",
+  "callbackUrl": "https://your-app.com/payg/success"
+}
+```
+
+Same response shape as initialize. Rejects `subscription` plans.
+
+#### Subscription status
+
+```
+GET /subscriptions/status
+Authorization: Bearer {account_jwt}
+```
+
+Returns subscription **and** PAYG in one payload so the UI can show `paymentType`:
+
+```json
+{
+  "subscription": {
+    "id": "uuid",
+    "status": "active",
+    "cancelAtPeriodEnd": false,
+    "plan": {
       "id": "uuid",
-      "name": "Essential Protection",
+      "name": "Basic Shield",
       "tier": 1,
-      "amount": 1500000,
+      "accountType": "individual",
+      "paymentType": "subscription",
+      "interval": "monthly",
+      "amount": 5000000,
       "currency": "NGN",
-      "description": "...",
-      "features": [...],
-      "maxIncidents": 1 // or null for unlimited
+      "features": [],
+      "maxIncidents": 1
     },
-    ...
-  ]
+    "usage": {
+      "usedIncidents": 0,
+      "remainingIncidents": 1,
+      "maxIncidents": 1
+    },
+    "currentPeriodStart": "...",
+    "currentPeriodEnd": "...",
+    "nextBillingDate": "..."
+  },
+  "payg": {
+    "paymentType": "one_time",
+    "creditsAvailable": 0
+  },
+  "entitlement": {
+    "hasAccess": true,
+    "sources": ["subscription"]
+  }
 }
 ```
 
-```
+If there is no recurring plan but PAYG credits exist, `subscription` is `null` and `payg.creditsAvailable` / `entitlement.sources` still reflect access.
 
----
-
-### Protected Endpoints (Require Auth)
-
-#### 2. Initialize Subscription
+#### Cancel / resume
 
 ```
+POST /subscriptions/cancel
+POST /subscriptions/resume
+Authorization: Bearer {account_jwt}
+```
 
-POST /api/subscriptions/initialize
+Cancel sets `cancelAtPeriodEnd: true` (access until period end). Resume clears that flag.
 
-Headers:
+#### Transactions history
 
-- Authorization: Bearer {token}
+```
+GET /subscriptions/transactions
+Authorization: Bearer {account_jwt}
+```
 
-Body:
+(Paginated account payment history.)
+
+### Admin (staff JWT — `SUPER_ADMIN` / `ADMIN`)
+
+Plan CRUD lives under admin. Full guide: [`ADMIN_SUBSCRIPTION_PLANS.md`](./ADMIN_SUBSCRIPTION_PLANS.md).
+
+```
+GET    /admin/subscription-plans
+GET    /admin/subscription-plans?paymentType=subscription
+GET    /admin/subscription-plans?paymentType=one_time
+GET    /admin/subscription-plans?accountType=individual&paymentType=one_time
+POST   /admin/subscription-plans
+PATCH  /admin/subscription-plans/:id
+DELETE /admin/subscription-plans/:id
+```
+
+Create body (subscription):
+
+```json
 {
-"planId": "uuid",
-"callbackUrl": "<https://your-app.com/subscription/success>"
+  "name": "Basic Shield",
+  "tier": 1,
+  "accountType": "individual",
+  "paymentType": "subscription",
+  "amount": 5000000,
+  "currency": "NGN",
+  "interval": "monthly",
+  "description": "...",
+  "features": ["..."],
+  "maxIncidents": 1,
+  "active": true
 }
+```
 
-Response:
+Create body (one-time) — **omit `interval`**:
+
+```json
 {
-"authorizationUrl": "<https://paystack.com/pay/xxxxx>",
-"reference": "xxxxx",
-"accessCode": "xxxxx"
+  "name": "Pay As You Go",
+  "tier": 0,
+  "accountType": "individual",
+  "paymentType": "one_time",
+  "amount": 2500000,
+  "currency": "NGN",
+  "description": "...",
+  "features": ["..."],
+  "maxIncidents": 1,
+  "active": true
 }
-
 ```
 
-#### 3. Verify Payment
+Amounts are **kobo** (`5000000` = ₦50,000).
+
+### Webhook (no user auth)
 
 ```
-
-GET /api/subscriptions/verify?reference=xxxxx
-
-Headers:
-
-- Authorization: Bearer {token}
-
-Response (Success):
-{
-"status": "active",
-"subscription": {
-"id": "uuid",
-"plan": {
-"name": "Essential Protection",
-"tier": 1
-},
-"startDate": "2025-01-01",
-"endDate": "2025-02-01",
-"nextBillingDate": "2025-02-01"
-}
-}
-
-Response (Failure):
-{
-"message": "Payment verification failed"
-}
-
-```
-
-#### 4. Get Current Subscription Status
-
-```
-
-GET /api/subscriptions/status
-
-Headers:
-
-- Authorization: Bearer {token}
-
-Response:
-{
-"subscription": {
-"id": "uuid",
-"status": "active",
-"plan": {
-"name": "Essential Protection",
-"tier": 1,
-"features": [...]
-},
-"currentPeriodStart": "2025-01-01T00:00:00Z",
-"currentPeriodEnd": "2025-02-01T00:00:00Z",
-"nextBillingDate": "2025-02-01T00:00:00Z"
-}
-}
-
-OR if no subscription:
-{
-"subscription": null,
-"message": "No active subscription"
-}
-
-```
-
-#### 5. Cancel Subscription
-
-```
-
-POST /api/subscriptions/cancel
-
-Headers:
-
-- Authorization: Bearer {token}
-
-Response:
-{
-"message": "Subscription will be cancelled at period end",
-"subscription": {
-"status": "active",
-"cancelledAt": null,
-"cancelAtPeriodEnd": true
-}
-}
-
-```
-
-#### 6. Resume Cancelled Subscription
-
-```
-
-POST /api/subscriptions/resume
-
-Headers:
-
-- Authorization: Bearer {token}
-
-Response:
-{
-"message": "Subscription resumed successfully",
-"subscription": {
-"cancelAtPeriodEnd": false
-}
-}
-
-```
-
----
-
-### Webhook Endpoint (No Auth)
-
-#### 7. Paystack Webhooks
-
-```
-
-POST /api/subscriptions/webhook
-
-Headers:
-
-- x-paystack-signature: {signature from Paystack}
-
-Body:
-{
-"event": "subscription.create|disable|enable|invoice.create|etc",
-"data": {...}
-}
-
-Response:
-200 OK
-
+POST /webhooks/paystack
+Headers: x-paystack-signature: {signature}
 ```
 
 ---
 
 ## 5. Webhook Events
 
-### Event Types & Actions
+| Event | Action |
+|---|---|
+| `subscription.create` | Attach Paystack subscription codes; link pending transactions |
+| `subscription.enable` | Set status `active` |
+| `subscription.disable` | Set `expired` / end access path |
+| `invoice.create` | Log / prep renewal |
+| `charge.success` | If metadata `type=payg` → grant `incident_credits`. Else → renew/activate subscription + transaction |
+| `invoice.payment_failed` / `charge.failed` | Mark `past_due`, notify account |
 
-#### 5.1 `subscription.create`
-
-- **Triggered**: When subscription is successfully created
-- **Action**: Mark subscription as `active`, set period dates
-
-#### 5.2 `subscription.enable`
-
-- **Triggered**: When a disabled subscription is re-enabled
-- **Action**: Update status to `active`
-
-#### 5.3 `subscription.disable`
-
-- **Triggered**: When subscription is disabled (payment failure)
-- **Action**: Update status to `past_due` or `expired`
-
-#### 5.4 `invoice.create`
-
-- **Triggered**: Monthly before billing
-- **Action**: Log invoice creation
-
-#### 5.5 `charge.success`
-
-- **Triggered**: Successful monthly payment
-- **Action**: Update subscription dates, extend period
-
-#### 5.6 `invoice.payment_failed`
-
-- **Triggered**: Failed payment
-- **Action**: Update status to `past_due`, notify user
-
-#### 5.7 `charge.failed`
-
-- **Triggered**: Charge attempt failed
-- **Action**: Update status accordingly
+**PAYG branch:** `charge.success` with `metadata.type === "payg"` (or `paymentType: one_time`) must **not** create a recurring `subscriptions` row.
 
 ---
 
 ## 6. Testing Guide
 
-### Test Mode Setup
+### Cards (Paystack test mode)
 
-1. Use Paystack **Test Mode** keys in development
-2. Use test card numbers:
-   - **Success**: `4084084084084081`
-   - **Failure**: `5084084084084085`
-3. CVV: Any 3 digits (e.g., `408`)
-4. Expiry: Any future date
+- Success: `4084084084084081`
+- Failure: `5085085085085080` (confirm current Paystack docs)
+- CVV: any 3 digits; expiry: any future date
 
-### Test Flow
+### Flows to test
 
-1. **Create Test Plans in Paystack Dashboard**
-   - Go to test mode
-   - Create 6 plans with test prices (e.g., ₦100, ₦200, etc.)
-
-2. **Test Subscription Creation**
-
-```
-
-POST /api/subscriptions/initialize
-Use test card: 4084084084084081
-
-```
-
-3. **Test Webhook Locally**
-
-**Option A: Using ngrok (Recommended for local testing)**
-
-```
-
-1. Install ngrok: <https://ngrok.com/download>
-2. Start your local server: npm run start:dev (port 3000)
-3. In another terminal, run: ngrok http 3000
-4. Copy the ngrok URL (e.g., <https://abc123.ngrok.io>)
-5. Go to Paystack Dashboard → Settings → Webhooks
-6. Add webhook URL: <https://abc123.ngrok.io/api/subscriptions/webhook>
-7. Now test by creating a subscription
-
-```
-
-**Option B: Using Paystack Webhook Simulator**
-- Use [Paystack Webhook Simulator](https://paystack.com/docs/payments/test-payments)
-- Send test events to your local endpoint
-- Note: This requires manually triggering events
-
-**Option C: Test Production Webhook Locally**
-- Use [webhook.site](https://webhook.site) to capture webhook events
-- Copy the unique URL and add to Paystack
-- Manually process the captured events in your backend
-
-4. **Test Lifecycle**
-- Create subscription
-- Trigger payment success webhook
-- Trigger payment failure webhook
-- Cancel subscription
-- Resume subscription
+1. Admin creates `subscription` plan → public list with `?paymentType=subscription`
+2. Admin creates `one_time` plan → list with `?paymentType=one_time`
+3. Account `POST /subscriptions/initialize` → pay → status active
+4. Account `POST /subscriptions/initialize-payg` → pay → `incident_credits` available
+5. Staff creates ticket with `accountId` → eligibility uses sub remaining incidents **or** PAYG credit
+6. Cancel / resume subscription
+7. Local webhooks via ngrok → `https://xxxx.ngrok.io/api/v1/webhooks/paystack`
 
 ---
 
-## 7. Implementation File Structure
+## 7. File Structure
 
 ```
-
 src/modules/subscriptions/
 ├── entities/
-│ ├── subscription-plan.entity.ts
-│ ├── subscription.entity.ts
-│ └── paystack-event.entity.ts
+│   ├── subscription-plan.entity.ts
+│   ├── subscription.entity.ts
+│   ├── transaction.entity.ts
+│   ├── incident-credit.entity.ts
+│   └── paystack-event.entity.ts
+├── enums/
+│   └── plan-payment-type.enum.ts   # subscription | one_time
 ├── dto/
-│ ├── initialize-subscription.dto.ts
-│ ├── verify-payment.dto.ts
-│ └── cancel-subscription.dto.ts
+│   ├── initialize-subscription.dto.ts
+│   └── cancel-subscription.dto.ts
 ├── services/
-│ ├── subscriptions.service.ts
-│ └── paystack.service.ts
+│   ├── subscriptions.service.ts
+│   ├── paystack.service.ts
+│   └── paystack-webhook.service.ts
 ├── controllers/
-│ └── subscriptions.controller.ts
+│   ├── subscriptions.controller.ts
+│   └── webhooks.controller.ts
 └── repository/
-└── subscriptions.repository.ts
+    ├── subscriptions.repository.ts
+    ├── transactions.repository.ts
+    └── incident-credits.repository.ts
+```
 
-````
-
----
-
-## 8. Security Considerations
-
-1. **Webhook Verification**
-   - Always verify Paystack signature to prevent fake events
-2. **API Key Security**
-   - Never expose secret key in frontend
-   - Store in environment variables only
-3. **Idempotency**
-   - Handle duplicate webhooks gracefully
-   - Check `paystackEventId` before processing
-
-4. **Error Handling**
-   - Log all webhook events for debugging
-   - Handle edge cases (expired cards, bank issues)
-5. **Data Privacy**
-   - Don't store card details (Paystack handles this)
-   - Only store necessary metadata
+Admin plan create/update: `src/modules/admin/admin.service.ts` + `dto/subscription-plan.dto.ts`
 
 ---
 
-## 9. Future Enhancements
+## 8. Security
 
-1. **Trial Periods**
-   - Add 7-day free trial for new users
-2. **Upgrades/Downgrades**
-   - Prorated billing when switching plans
-3. **Coupons/Promotions**
-   - Discount codes system
-4. **Usage Tracking**
-   - Track incident usage vs. plan limits
-5. **Email Notifications**
-   - Send emails on subscription events
-6. **Admin Dashboard**
-   - View all subscriptions, revenue, etc.
+1. Verify Paystack webhook signatures
+2. Never expose secret key to the frontend
+3. Idempotent webhook handling (`paystack_events` / transaction reference)
+4. Do not store card details
+5. Use account JWT for customer payment routes; staff JWT for admin plan CRUD
 
 ---
 
-## 10. Environment Variables Summary
+## 9. Environment Variables
 
 ```env
-# Paystack
 PAYSTACK_SECRET_KEY=sk_test_xxxxx
 PAYSTACK_PUBLIC_KEY=pk_test_xxxxx
 PAYSTACK_WEBHOOK_SECRET=xxxxx
+```
 
-# Frontend callback URL
-FRONTEND_SUBSCRIPTION_SUCCESS_URL=http://localhost:3000/subscription/success
-FRONTEND_SUBSCRIPTION_FAILURE_URL=http://localhost:3000/subscription/failed
-````
+Frontend callback URLs are supplied per request as `callbackUrl` on initialize / initialize-payg.
 
 ---
 
 ## Quick Start Checklist
 
-- [ ] Create Paystack account
-- [ ] Get API keys (test mode)
-- [ ] Create 6 subscription plans in Paystack
-- [ ] Configure webhook URL
-- [ ] Add environment variables
-- [ ] Create database entities
-- [ ] Implement Paystack service
-- [ ] Implement subscription service
-- [ ] Create controller endpoints
-- [ ] Test with test cards
-- [ ] Deploy and switch to live keys
+- [ ] Paystack account + test keys
+- [ ] Webhook → `/api/v1/webhooks/paystack`
+- [ ] Env vars set
+- [ ] Admin creates subscription plans (`paymentType: subscription`)
+- [ ] Admin creates PAYG products (`paymentType: one_time`)
+- [ ] Test public filters: `accountType` + `paymentType`
+- [ ] Test `initialize` and `initialize-payg` with test cards
+- [ ] Confirm ticket eligibility (sub limit vs PAYG credit)
+- [ ] Switch to live keys for production
+
+---
+
+## Related docs
+
+- [`PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md`](./PUBLIC_AND_ACCOUNT_SUBSCRIPTIONS.md) — public pricing + account billing APIs (FE handoff)
+- [`ADMIN_SUBSCRIPTION_PLANS.md`](./ADMIN_SUBSCRIPTION_PLANS.md) — admin UI + create/update payloads
+- [`FRONTEND_TICKETS_UI.md`](./FRONTEND_TICKETS_UI.md) — tickets, `createdFor`, eligibility, PAYG credits

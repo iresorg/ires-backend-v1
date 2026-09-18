@@ -121,59 +121,13 @@ export class SubscriptionsController {
 	@UseGuards(AccountsAuthGuard)
 	@Get("status")
 	@ApiOperation({
-		summary: "Get current subscription status",
-		description: "Get the active subscription details for the current user",
+		summary: "Get billing entitlement status",
+		description:
+			"Returns active subscription (with paymentType + usage), pay-as-you-go credits, and overall entitlement. Account JWT required.",
 	})
 	@ApiResponse({
 		status: 200,
-		description: "Subscription status retrieved successfully",
-		schema: {
-			type: "object",
-			properties: {
-				subscription: {
-					type: "object",
-					properties: {
-						id: { type: "string" },
-						status: { type: "string", example: "active" },
-						plan: {
-							type: "object",
-							properties: {
-								name: { type: "string" },
-								tier: { type: "number" },
-								features: { type: "array" },
-								maxIncidents: {
-									type: "number",
-									nullable: true,
-								},
-							},
-						},
-						currentPeriodStart: {
-							type: "string",
-							format: "date-time",
-						},
-						currentPeriodEnd: {
-							type: "string",
-							format: "date-time",
-						},
-						nextBillingDate: {
-							type: "string",
-							format: "date-time",
-						},
-					},
-				},
-			},
-		},
-	})
-	@ApiResponse({
-		status: 200,
-		description: "No active subscription",
-		schema: {
-			type: "object",
-			properties: {
-				subscription: { type: "null" },
-				message: { type: "string", example: "No active subscription" },
-			},
-		},
+		description: "Status retrieved successfully",
 	})
 	async getSubscriptionStatus(@Req() req: any) {
 		return await this.subscriptionsService.getSubscriptionStatus(

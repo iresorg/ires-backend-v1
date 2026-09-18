@@ -174,9 +174,14 @@ export class AdminController {
 	@Get("subscribers")
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
 	@ApiOperation({
-		summary: "Get all subscribers",
+		summary: "Get subscribers / PAYG customers",
 		description:
-			"Get paginated list of users with active subscriptions. Includes subscription details like plan, status, dates. Only accessible by SUPER_ADMIN and ADMIN.",
+			"Lists recurring subscribers by default. Pass paymentType=one_time for pay-as-you-go customers. Each row includes paymentType.",
+	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
 	})
 	@ApiResponse({
 		status: 200,
@@ -200,10 +205,21 @@ export class AdminController {
 								enum: ["individual", "organization"],
 								example: "individual",
 							},
+							planId: { type: "string", nullable: true },
 							planSubscribedTo: {
 								type: "string",
 								nullable: true,
 								example: "Premium Plan",
+							},
+							paymentType: {
+								type: "string",
+								enum: ["subscription", "one_time"],
+								example: "subscription",
+							},
+							interval: {
+								type: "string",
+								nullable: true,
+								example: "monthly",
 							},
 							amount: {
 								type: "number",
@@ -224,14 +240,13 @@ export class AdminController {
 							},
 							status: {
 								type: "string",
-								enum: [
-									"active",
-									"expired",
-									"cancelled",
-									"past_due",
-								],
 								nullable: true,
 								example: "active",
+							},
+							paygCreditsAvailable: {
+								type: "number",
+								nullable: true,
+								example: 1,
 							},
 						},
 					},
