@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from "@nestjs/common";
 import {
 	ApiTags,
 	ApiBearerAuth,
@@ -12,6 +12,15 @@ import { SubscribersQueryDto } from "./dto/subscribers-query.dto";
 import { UserResponseDto } from "./dto/user-response.dto";
 import { SubscriberResponseDto } from "./dto/subscriber-response.dto";
 import { OverviewResponseDto } from "./dto/overview-response.dto";
+import {
+	CreateSubscriptionPlanDto,
+	UpdateSubscriptionPlanDto,
+} from "./dto/subscription-plan.dto";
+import {
+	FinancialsOverviewQueryDto,
+	FinancialsTransactionsQueryDto,
+	PaystackSettlementsQueryDto,
+} from "./dto/financials-query.dto";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
@@ -170,9 +179,14 @@ export class AdminController {
 	@Get("subscribers")
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
 	@ApiOperation({
-		summary: "Get all subscribers",
+		summary: "Get subscribers / PAYG customers",
 		description:
-			"Get paginated list of users with active subscriptions. Includes subscription details like plan, status, dates. Only accessible by SUPER_ADMIN and ADMIN.",
+			"Lists recurring subscribers by default. Pass paymentType=one_time for pay-as-you-go customers. Each row includes paymentType.",
+	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
 	})
 	@ApiResponse({
 		status: 200,
@@ -196,10 +210,21 @@ export class AdminController {
 								enum: ["individual", "organization"],
 								example: "individual",
 							},
+							planId: { type: "string", nullable: true },
 							planSubscribedTo: {
 								type: "string",
 								nullable: true,
 								example: "Premium Plan",
+							},
+							paymentType: {
+								type: "string",
+								enum: ["subscription", "one_time"],
+								example: "subscription",
+							},
+							interval: {
+								type: "string",
+								nullable: true,
+								example: "monthly",
 							},
 							amount: {
 								type: "number",
@@ -220,14 +245,13 @@ export class AdminController {
 							},
 							status: {
 								type: "string",
-								enum: [
-									"active",
-									"expired",
-									"cancelled",
-									"past_due",
-								],
 								nullable: true,
 								example: "active",
+							},
+							paygCreditsAvailable: {
+								type: "number",
+								nullable: true,
+								example: 1,
 							},
 						},
 					},
@@ -262,5 +286,149 @@ export class AdminController {
 
 		const result = await this.adminService.getSubscribers(query);
 		return { subscribers: result.subscribers, total: result.total };
+	}
+
+	@Get("subscription-plans")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "List all subscription plans",
+		description:
+			"Returns every subscription plan, including inactive ones. Filter by accountType and/or paymentType.",
+	})
+	@ApiQuery({
+		name: "accountType",
+		required: false,
+		enum: ["individual", "organization"],
+	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
+	})
+	async getSubscriptionPlans(
+		@Query("accountType") accountType?: "individual" | "organization",
+		@Query("paymentType") paymentType?: string,
+	) {
+		const plans = await this.adminService.getSubscriptionPlans({
+			accountType,
+			paymentType,
+		});
+		return { plans };
+	}
+
+	@Post("subscription-plans")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Create a subscription plan",
+		description:
+			"Create a plan in the database. If paystackPlanCode is omitted, a matching Paystack plan is created automatically. Amount is in kobo.",
+	})
+	async createSubscriptionPlan(@Body() dto: CreateSubscriptionPlanDto) {
+		const plan = await this.adminService.createSubscriptionPlan(dto);
+		return { message: "Subscription plan created", plan };
+	}
+
+	@Patch("subscription-plans/:id")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Update a subscription plan",
+		description:
+			"Update amount, features, name, or active status. Amount changes are synced to Paystack for new subscribers.",
+	})
+	async updateSubscriptionPlan(
+		@Param("id") id: string,
+		@Body() dto: UpdateSubscriptionPlanDto,
+	) {
+		const plan = await this.adminService.updateSubscriptionPlan(id, dto);
+		return { message: "Subscription plan updated", plan };
+	}
+
+	@Delete("subscription-plans/:id")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Delete or deactivate a subscription plan",
+		description:
+			"Deletes the plan if nobody is subscribed. If subscribers exist, the plan is deactivated instead.",
+	})
+	async deleteSubscriptionPlan(@Param("id") id: string) {
+		return this.adminService.deleteSubscriptionPlan(id);
+	}
+
+	@Get("financials/overview")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Admin financials overview (from local payments)",
+		description:
+			"Revenue, success/fail counts, PAYG vs subscription split, approximate MRR, and monthly chart. Amounts in kobo.",
+	})
+	async getFinancialsOverview(@Query() query: FinancialsOverviewQueryDto) {
+		return this.adminService.getFinancialsOverview(query);
+	}
+
+	@Get("financials/transactions")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Admin payment ledger",
+		description:
+			"Paginated local Paystack-backed transactions with status and paymentType filters.",
+	})
+	async getFinancialsTransactions(
+		@Query() query: FinancialsTransactionsQueryDto,
+	): Promise<
+		| PaginationResult<Record<string, unknown>>
+		| { transactions: Record<string, unknown>[]; total: number }
+	> {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+		const result = await this.adminService.getFinancialsTransactions({
+			...query,
+			page,
+			limit,
+		});
+
+		if (query.page && query.limit) {
+			return buildPaginationResult(result.transactions, result.total, {
+				page,
+				limit,
+			});
+		}
+
+		return result;
+	}
+
+	@Get("financials/paystack/balance")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Paystack wallet balance (live)",
+		description: "Proxies Paystack GET /balance so ops need not open the Paystack dashboard.",
+	})
+	async getPaystackBalance() {
+		return this.adminService.getPaystackBalance();
+	}
+
+	@Get("financials/paystack/settlements")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Paystack settlements (live)",
+		description: "Proxies Paystack GET /settlement for bank payout history.",
+	})
+	async getPaystackSettlements(@Query() query: PaystackSettlementsQueryDto) {
+		return this.adminService.getPaystackSettlements(query);
+	}
+
+	@Get("financials/sync-paystack")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Backfill local payment ledger from Paystack",
+		description:
+			"Imports/updates subscription_transactions from Paystack charges in the date range. Query-only (no body). Run once (or periodically) so revenue uses local source of truth.",
+	})
+	async syncPaystackTransactions(
+		@Query() query: FinancialsOverviewQueryDto,
+	) {
+		return this.adminService.syncPaystackTransactions({
+			from: query.from,
+			to: query.to,
+		});
 	}
 }

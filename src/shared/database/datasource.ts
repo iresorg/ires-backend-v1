@@ -19,6 +19,7 @@ import { Subscription } from "@/modules/subscriptions/entities/subscription.enti
 import { SubscriptionPlan } from "@/modules/subscriptions/entities/subscription-plan.entity";
 import { PaystackEvent } from "@/modules/subscriptions/entities/paystack-event.entity";
 import { SubscriptionTransaction } from "@/modules/subscriptions/entities/transaction.entity";
+import { IncidentCredit } from "@/modules/subscriptions/entities/incident-credit.entity";
 
 export function createDataSourceOptions(
 	env?: Partial<EnvVariables>,
@@ -50,6 +51,7 @@ export function createDataSourceOptions(
 			SubscriptionPlan,
 			PaystackEvent,
 			SubscriptionTransaction,
+			IncidentCredit,
 		],
 		migrations: loadMigrations
 			? ["src/shared/database/migrations/*.ts"]

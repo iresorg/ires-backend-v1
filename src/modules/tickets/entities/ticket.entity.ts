@@ -15,8 +15,15 @@ import {
 	TicketTiers,
 } from "../interfaces/ticket.interface";
 import { User } from "@/modules/users/entities/user.entity";
+import { Account } from "@/modules/accounts/entities/account.entity";
 import { TicketCategory } from "@/modules/ticket-categories/entities/ticket-category.entity";
 import { TicketSubCategory } from "@/modules/ticket-categories/entities/ticket-sub-category.entity";
+import { IncidentCredit } from "@/modules/subscriptions/entities/incident-credit.entity";
+
+export enum TicketEntitlementSource {
+	SUBSCRIPTION = "subscription",
+	PAYG = "payg",
+}
 
 @Entity()
 export class Tickets {
@@ -62,6 +69,33 @@ export class Tickets {
 		foreignKeyConstraintName: "FK_ticket_created_by_user_id",
 	})
 	createdBy: User;
+
+	@ManyToOne(() => Account, { nullable: true })
+	@JoinColumn({
+		name: "created_for_account_id",
+		foreignKeyConstraintName: "FK_ticket_created_for_account_id",
+	})
+	createdFor: Account;
+
+	@Column({ type: "uuid", name: "created_for_account_id", nullable: true })
+	createdForAccountId: string | null;
+
+	@Column({
+		type: "varchar",
+		name: "entitlement_source",
+		nullable: true,
+	})
+	entitlementSource: TicketEntitlementSource | null;
+
+	@ManyToOne(() => IncidentCredit, { nullable: true })
+	@JoinColumn({
+		name: "incident_credit_id",
+		foreignKeyConstraintName: "FK_ticket_incident_credit_id",
+	})
+	incidentCredit: IncidentCredit | null;
+
+	@Column({ type: "uuid", name: "incident_credit_id", nullable: true })
+	incidentCreditId: string | null;
 
 	@CreateDateColumn({
 		name: "created_at",

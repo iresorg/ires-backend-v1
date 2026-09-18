@@ -50,29 +50,14 @@ export class Seeder {
 
 	async seedSubscriptionPlans() {
 		const planRepository = this.dataSource.getRepository(SubscriptionPlan);
+		const existingCount = await planRepository.count();
+		if (existingCount > 0) {
+			return;
+		}
 
 		for (const planData of SUBSCRIPTION_PLANS) {
-			const existingPlan = await planRepository.findOne({
-				where: { paystackPlanCode: planData.paystackPlanCode },
-			});
-
-			if (existingPlan) {
-				await planRepository.update(existingPlan.id, {
-					name: planData.name,
-					tier: planData.tier,
-					accountType: planData.accountType,
-					amount: planData.amount,
-					currency: planData.currency,
-					interval: planData.interval,
-					description: planData.description,
-					features: planData.features,
-					maxIncidents: planData.maxIncidents,
-					active: planData.active,
-				});
-			} else {
-				const plan = planRepository.create(planData);
-				await planRepository.save(plan);
-			}
+			const plan = planRepository.create(planData);
+			await planRepository.save(plan);
 		}
 	}
 }

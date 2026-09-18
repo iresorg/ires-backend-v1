@@ -12,6 +12,26 @@ export class PaystackService {
 		this.secretKey = this.config.get<string>("PAYSTACK_SECRET_KEY") || "";
 	}
 
+	/**
+	 * Restrict path segments used in Paystack URLs to a conservative allowlist
+	 * (blocks path traversal / host injection style SSRF via user-controlled codes).
+	 */
+	private sanitizePathSegment(
+		value: string,
+		label: string,
+		maxLength = 64,
+	): string {
+		const trimmed = value?.trim();
+		if (
+			!trimmed ||
+			trimmed.length > maxLength ||
+			!/^[A-Za-z0-9_-]+$/.test(trimmed)
+		) {
+			throw new Error(`Invalid Paystack ${label} format`);
+		}
+		return trimmed;
+	}
+
 	private getHeaders() {
 		return {
 			Authorization: `Bearer ${this.secretKey}`,
@@ -42,8 +62,11 @@ export class PaystackService {
 
 	async verifyTransaction(reference: string) {
 		try {
+			const safeReference = encodeURIComponent(
+				this.sanitizePathSegment(reference, "transaction reference", 128),
+			);
 			const response = await axios.get(
-				`${this.baseURL}/transaction/verify/${reference}`,
+				`${this.baseURL}/transaction/verify/${safeReference}`,
 				{ headers: this.getHeaders() },
 			);
 			return response.data;
@@ -130,11 +153,121 @@ export class PaystackService {
 		}
 	}
 
+	async createPlan(data: {
+		name: string;
+		interval: string;
+		amount: number;
+		currency?: string;
+		description?: string;
+	}) {
+		try {
+			const response = await axios.post(`${this.baseURL}/plan`, data, {
+				headers: this.getHeaders(),
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack create plan error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
+	async updatePlan(
+		planCode: string,
+		data: {
+			name?: string;
+			interval?: string;
+			amount?: number;
+			currency?: string;
+			description?: string;
+			update_existing_subscriptions?: boolean;
+		},
+	) {
+		try {
+			const safePlanCode = encodeURIComponent(
+				this.sanitizePathSegment(planCode, "plan code"),
+			);
+			const response = await axios.put(
+				`${this.baseURL}/plan/${safePlanCode}`,
+				data,
+				{ headers: this.getHeaders() },
+			);
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack update plan error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
 	verifyWebhookSignature(payload: string, signature: string): boolean {
 		const hash = crypto
 			.createHmac("sha512", this.secretKey)
 			.update(payload)
 			.digest("hex");
 		return hash === signature;
+	}
+
+	async getBalance() {
+		try {
+			const response = await axios.get(`${this.baseURL}/balance`, {
+				headers: this.getHeaders(),
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack balance error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
+	async listTransactions(params?: {
+		perPage?: number;
+		page?: number;
+		from?: string;
+		to?: string;
+		status?: string;
+	}) {
+		try {
+			const response = await axios.get(`${this.baseURL}/transaction`, {
+				headers: this.getHeaders(),
+				params: {
+					perPage: params?.perPage ?? 100,
+					page: params?.page ?? 1,
+					from: params?.from,
+					to: params?.to,
+					status: params?.status,
+				},
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack list transactions error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
+	async listSettlements(params?: {
+		perPage?: number;
+		page?: number;
+		from?: string;
+		to?: string;
+	}) {
+		try {
+			const response = await axios.get(`${this.baseURL}/settlement`, {
+				headers: this.getHeaders(),
+				params: {
+					perPage: params?.perPage ?? 20,
+					page: params?.page ?? 1,
+					from: params?.from,
+					to: params?.to,
+				},
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack settlements error: ${error.response?.data?.message || error.message}`,
+			);
+		}
 	}
 }

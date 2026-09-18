@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import {
 	ITicket,
 	ITicketCreate,
@@ -9,7 +9,11 @@ import {
 	TicketTiers,
 } from "./interfaces/ticket.interface";
 import { UsersService } from "@/modules/users/users.service";
-import { TicketNotFoundError } from "@/shared/errors/ticket.errors";
+import {
+	TicketAccountNotEligibleError,
+	TicketAccountNotFoundError,
+	TicketNotFoundError,
+} from "@/shared/errors/ticket.errors";
 import { EmailService } from "@/shared/email/service";
 import { Role } from "../users/enums/role.enum";
 import { TicketsRepository } from "./repository";
@@ -19,8 +23,49 @@ import {
 } from "@/shared/database/datasource";
 import { TicketLifecycleRepository } from "./ticket-lifecycle.repository";
 import { AssignResponder, ReassignTicket } from "./types";
-import { PaginatedResponse, PaginationQuery } from "@/shared/utils/pagination";
+import { PaginatedResponse, PaginationQuery, getPaginationMeta } from "@/shared/utils/pagination";
 import { FileUploadService } from "../file-upload/service";
+import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
+import { SubscriptionsRepository } from "@/modules/subscriptions/repository/subscriptions.repository";
+import { IncidentCreditsRepository } from "@/modules/subscriptions/repository/incident-credits.repository";
+import { TicketEntitlementSource } from "./entities/ticket.entity";
+import { Account } from "@/modules/accounts/entities/account.entity";
+import { IUser } from "@/modules/users/interfaces/user.interface";
+
+export type TicketEligibility = {
+	eligible: boolean;
+	accountId: string;
+	email: string;
+	source: TicketEntitlementSource | null;
+	subscription: {
+		id: string;
+		planName: string;
+		maxIncidents: number | null;
+		usedIncidents: number;
+		remainingIncidents: number | null;
+		currentPeriodStart: Date;
+		currentPeriodEnd: Date;
+	} | null;
+	paygCreditsAvailable: number;
+	reason?: string;
+};
+
+export type EligibleAccountRow = {
+	accountId: string;
+	email: string;
+	name: string;
+	role: string;
+	status: string;
+	source: TicketEntitlementSource;
+	subscription: TicketEligibility["subscription"];
+	paygCreditsAvailable: number;
+	/** Tickets created for this account in the current subscription period (0 if PAYG-only). */
+	usedIncidentsThisPeriod: number;
+	/** Remaining subscription incidents this period; null = unlimited; 0 if using PAYG only. */
+	remainingIncidentsThisPeriod: number | null;
+	/** Lifetime tickets created for this account. */
+	ticketsCreatedTotal: number;
+};
 
 @Injectable()
 export class TicketsService {
@@ -31,22 +76,276 @@ export class TicketsService {
 		private readonly emailService: EmailService,
 		private readonly databaseService: TDatabaseService,
 		private readonly fileUploadService: FileUploadService,
+		private readonly accountsRepo: AccountsRepository,
+		private readonly subscriptionsRepo: SubscriptionsRepository,
+		private readonly incidentCreditsRepo: IncidentCreditsRepository,
 	) {}
 
+	async getAccountEligibility(accountId: string): Promise<TicketEligibility> {
+		const account = await this.accountsRepo.findById(accountId);
+		if (!account) {
+			throw new TicketAccountNotFoundError();
+		}
+
+		const paygCreditsAvailable =
+			await this.incidentCreditsRepo.countAvailableByAccountId(accountId);
+
+		const subscription =
+			await this.subscriptionsRepo.findActiveSubscriptionByAccountId(
+				accountId,
+			);
+
+		if (subscription) {
+			const usedIncidents =
+				await this.ticketsRepository.countTicketsForAccountInPeriod(
+					accountId,
+					subscription.currentPeriodStart,
+					subscription.currentPeriodEnd,
+				);
+			const maxIncidents = subscription.plan.maxIncidents;
+			const remainingIncidents =
+				maxIncidents === null
+					? null
+					: Math.max(maxIncidents - usedIncidents, 0);
+			const hasSubscriptionRoom =
+				maxIncidents === null || usedIncidents < maxIncidents;
+
+			if (hasSubscriptionRoom) {
+				return {
+					eligible: true,
+					accountId: account.id,
+					email: account.email,
+					source: TicketEntitlementSource.SUBSCRIPTION,
+					subscription: {
+						id: subscription.id,
+						planName: subscription.plan.name,
+						maxIncidents,
+						usedIncidents,
+						remainingIncidents,
+						currentPeriodStart: subscription.currentPeriodStart,
+						currentPeriodEnd: subscription.currentPeriodEnd,
+					},
+					paygCreditsAvailable,
+				};
+			}
+
+			if (paygCreditsAvailable > 0) {
+				return {
+					eligible: true,
+					accountId: account.id,
+					email: account.email,
+					source: TicketEntitlementSource.PAYG,
+					subscription: {
+						id: subscription.id,
+						planName: subscription.plan.name,
+						maxIncidents,
+						usedIncidents,
+						remainingIncidents: 0,
+						currentPeriodStart: subscription.currentPeriodStart,
+						currentPeriodEnd: subscription.currentPeriodEnd,
+					},
+					paygCreditsAvailable,
+				};
+			}
+
+			return {
+				eligible: false,
+				accountId: account.id,
+				email: account.email,
+				source: null,
+				subscription: {
+					id: subscription.id,
+					planName: subscription.plan.name,
+					maxIncidents,
+					usedIncidents,
+					remainingIncidents: 0,
+					currentPeriodStart: subscription.currentPeriodStart,
+					currentPeriodEnd: subscription.currentPeriodEnd,
+				},
+				paygCreditsAvailable: 0,
+				reason: "Subscription incident limit reached and no PAYG credits available",
+			};
+		}
+
+		if (paygCreditsAvailable > 0) {
+			return {
+				eligible: true,
+				accountId: account.id,
+				email: account.email,
+				source: TicketEntitlementSource.PAYG,
+				subscription: null,
+				paygCreditsAvailable,
+			};
+		}
+
+		return {
+			eligible: false,
+			accountId: account.id,
+			email: account.email,
+			source: null,
+			subscription: null,
+			paygCreditsAvailable: 0,
+			reason:
+				"No active subscription or unused pay-as-you-go credit",
+		};
+	}
+
+	async getEligibleAccounts(query: {
+		search?: string;
+		source?: TicketEntitlementSource;
+		page?: number;
+		limit?: number;
+	}): Promise<PaginatedResponse<EligibleAccountRow>> {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+
+		const [subscriptionAccountIds, paygAccountIds] = await Promise.all([
+			query.source === TicketEntitlementSource.PAYG
+				? Promise.resolve([] as string[])
+				: this.subscriptionsRepo.findActiveAccountIds(),
+			query.source === TicketEntitlementSource.SUBSCRIPTION
+				? Promise.resolve([] as string[])
+				: this.incidentCreditsRepo.findAccountIdsWithAvailableCredits(),
+		]);
+
+		const candidateIds = [
+			...new Set([...subscriptionAccountIds, ...paygAccountIds]),
+		];
+
+		if (!candidateIds.length) {
+			return {
+				data: [],
+				pagination: getPaginationMeta(0, page, limit),
+			};
+		}
+
+		const accounts = await this.accountsRepo.findByIdsWithFilters({
+			ids: candidateIds,
+			search: query.search,
+		});
+
+		const rows: EligibleAccountRow[] = [];
+
+		for (const account of accounts) {
+			const [eligibility, ticketsCreatedTotal] = await Promise.all([
+				this.getAccountEligibility(account.id),
+				this.ticketsRepository.countTicketsForAccount(account.id),
+			]);
+
+			if (!eligibility.eligible || !eligibility.source) continue;
+			if (query.source && eligibility.source !== query.source) continue;
+
+			rows.push({
+				accountId: account.id,
+				email: account.email,
+				name: this.accountDisplayName(account),
+				role: account.role,
+				status: account.status,
+				source: eligibility.source,
+				subscription: eligibility.subscription,
+				paygCreditsAvailable: eligibility.paygCreditsAvailable,
+				usedIncidentsThisPeriod:
+					eligibility.subscription?.usedIncidents ?? 0,
+				remainingIncidentsThisPeriod:
+					eligibility.source === TicketEntitlementSource.SUBSCRIPTION
+						? (eligibility.subscription?.remainingIncidents ?? null)
+						: eligibility.paygCreditsAvailable,
+				ticketsCreatedTotal,
+			});
+		}
+
+		const total = rows.length;
+		const offset = (page - 1) * limit;
+		const data = rows.slice(offset, offset + limit);
+
+		return {
+			data,
+			pagination: getPaginationMeta(total, page, limit),
+		};
+	}
+
 	async createTicket(
-		body: Omit<ITicketCreate, "ticketId">,
+		body: {
+			accountId: string;
+			createdById: string;
+			title: string;
+			description: string;
+			location: string;
+			reporterName: string;
+			categoryId: string;
+			subCategoryId?: string;
+			internalNotes?: string;
+			contactInformation?: ITicketCreate["contactInformation"];
+			victimInformation?: ITicketCreate["victimInformation"];
+			attachments?: string[];
+			type?: string;
+		},
 		attachments?: Express.Multer.File[],
 	): Promise<ITicket> {
+		const eligibility = await this.getAccountEligibility(body.accountId);
+		if (!eligibility.eligible || !eligibility.source) {
+			throw new TicketAccountNotEligibleError(eligibility.reason);
+		}
+
 		const ticketId = this.generateTicketId();
 
 		if (attachments?.length) {
-			const result = await Promise.all(attachments.map((attachment) => this.fileUploadService.uploadImage(attachment)));
+			const result = await Promise.all(
+				attachments.map((attachment) =>
+					this.fileUploadService.uploadImage(attachment),
+				),
+			);
 			body.attachments = result.map((res) => res.secure_url);
 		}
 
 		await this.databaseService.withTransaction(async (trx) => {
+			let incidentCreditId: string | undefined;
+
+			if (eligibility.source === TicketEntitlementSource.PAYG) {
+				const credit =
+					await this.incidentCreditsRepo.findAvailableByAccountId(
+						body.accountId,
+						trx,
+					);
+				if (!credit) {
+					throw new TicketAccountNotEligibleError(
+						"No unused pay-as-you-go credit available",
+					);
+				}
+				incidentCreditId = credit.id;
+				await this.incidentCreditsRepo.consumeCredit(
+					credit.id,
+					ticketId,
+					trx,
+				);
+			} else if (
+				eligibility.source === TicketEntitlementSource.SUBSCRIPTION &&
+				eligibility.subscription
+			) {
+				// Re-check within the transaction window
+				const used =
+					await this.ticketsRepository.countTicketsForAccountInPeriod(
+						body.accountId,
+						eligibility.subscription.currentPeriodStart,
+						eligibility.subscription.currentPeriodEnd,
+						trx,
+					);
+				const max = eligibility.subscription.maxIncidents;
+				if (max !== null && used >= max) {
+					throw new TicketAccountNotEligibleError(
+						"Subscription incident limit reached",
+					);
+				}
+			}
+
 			await this.ticketsRepository.createTicket(
-				{ ...body, ticketId },
+				{
+					...body,
+					ticketId,
+					createdForAccountId: body.accountId,
+					entitlementSource: eligibility.source,
+					incidentCreditId,
+				},
 				trx,
 			);
 
@@ -83,18 +382,66 @@ export class TicketsService {
 			);
 		}
 
+		const customer = await this.accountsRepo.findById(body.accountId);
+		if (customer) {
+			await this.notifyAccount(
+				customer,
+				savedTicket,
+				TicketStatus.CREATED,
+				"Your incident ticket has been created",
+				"We have opened a ticket for your incident. Our team will review it shortly.",
+			);
+		}
+
 		return savedTicket;
 	}
 
-	async getTicketById(ticketId: string): Promise<ITicket | null> {
+	async getTicketById(ticketId: string): Promise<ITicket> {
 		const ticket = await this.ticketsRepository.getTicketById(ticketId);
 		if (!ticket) throw new TicketNotFoundError();
 
 		return ticket;
 	}
 
-	async getTickets(query: Partial<PaginationQuery & { status: TicketStatus }>): Promise<PaginatedResponse<ITicketSummary>> {
-		return this.ticketsRepository.getTickets({ status: query.status }, { limit: query.limit, page: query.page });
+	async getAccountTickets(
+		accountId: string,
+		query: Partial<PaginationQuery & { status: TicketStatus }>,
+	): Promise<PaginatedResponse<ITicketSummary>> {
+		return this.ticketsRepository.getTickets(
+			{ status: query.status, accountId },
+			{ limit: query.limit, page: query.page },
+		);
+	}
+
+	async getAccountTicketById(
+		accountId: string,
+		ticketId: string,
+	): Promise<ITicket> {
+		const ticket = await this.getTicketById(ticketId);
+		if (ticket.createdFor?.id !== accountId) {
+			throw new ForbiddenException(
+				"You do not have access to this ticket",
+			);
+		}
+		return this.toAccountTicketView(ticket);
+	}
+
+	async getAccountTicketLifecycle(
+		accountId: string,
+		ticketId: string,
+		query: PaginationQuery,
+	): Promise<PaginatedResponse<ITicketLifecycle>> {
+		await this.getAccountTicketById(accountId, ticketId);
+		return this.ticketLifecyleRepo.getByTicketId(ticketId, query);
+	}
+
+	async getTickets(
+		query: Partial<PaginationQuery & { status: TicketStatus }>,
+	): Promise<PaginatedResponse<ITicketSummary>> {
+		return this.ticketsRepository.getTickets(
+			{ status: query.status },
+			{ limit: query.limit, page: query.page },
+		);
 	}
 
 	async assignTicket(
@@ -124,8 +471,20 @@ export class TicketsService {
 				performedById,
 				lifeCycleNotes,
 				trx,
+				body.assignedResponderId,
+				body.severity,
+				body.tier,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyResponderAssigned(responder, updated, false);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.ASSIGNED,
+			"A responder has been assigned to your ticket",
+			`Responder ${responder.firstName} ${responder.lastName} will handle your incident.`,
+		);
 	}
 
 	async startAnalysingTicket(
@@ -144,6 +503,14 @@ export class TicketsService {
 				trx,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.ANALYSING,
+			"Your ticket is being analysed",
+			"Our team has started analysing your incident ticket.",
+		);
 	}
 
 	async startRespondingToTicket(
@@ -161,6 +528,23 @@ export class TicketsService {
 				trx,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.IN_PROGRESS,
+			"Response is in progress on your ticket",
+			"A responder is actively working on your incident.",
+		);
+		if (updated.assignedResponder) {
+			await this.notifyResponderStatus(
+				updated.assignedResponder.id,
+				updated,
+				TicketStatus.IN_PROGRESS,
+				"Ticket response started",
+				"You have started responding to this ticket.",
+			);
+		}
 	}
 
 	async escalateTicket(
@@ -202,6 +586,14 @@ export class TicketsService {
 				},
 			);
 		}
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.ESCALATED,
+			"Your ticket has been escalated",
+			"Your incident has been escalated for higher-level review. We will keep you updated.",
+		);
 	}
 
 	async reassignTicket(
@@ -209,19 +601,49 @@ export class TicketsService {
 		performerById: string,
 		body: ReassignTicket,
 	) {
-		await this.getTicketById(ticketId);
+		const [ticket, responder] = await Promise.all([
+			this.getTicketById(ticketId),
+			this.usersService.findOne({ id: body.assignedResponderId }),
+		]);
+
 		await this.databaseService.withTransaction(async (trx) => {
+			const lifeCycleNotes =
+				`Reassigned responder: ${responder.firstName + " " + responder.lastName}` +
+				(body.notes ? ` | ${body.notes}` : "");
+
 			await this.updateStatusAndLifecycle(
 				ticketId,
 				TicketStatus.REASSIGNED,
 				performerById,
-				body.notes,
+				lifeCycleNotes,
 				trx,
 				body.assignedResponderId,
 				body.severity,
 				body.tier,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyResponderAssigned(responder, updated, true);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.REASSIGNED,
+			"Your ticket has been reassigned",
+			`Responder ${responder.firstName} ${responder.lastName} is now handling your incident.`,
+		);
+
+		if (
+			ticket.assignedResponder &&
+			ticket.assignedResponder.id !== responder.id
+		) {
+			await this.notifyResponderStatus(
+				ticket.assignedResponder.id,
+				updated,
+				TicketStatus.REASSIGNED,
+				"Ticket reassigned away from you",
+				"This ticket has been reassigned to another responder.",
+			);
+		}
 	}
 
 	async resolveTicket(
@@ -239,6 +661,23 @@ export class TicketsService {
 				trx,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.RESOLVED,
+			"Your ticket has been resolved",
+			"Our team has marked your incident as resolved. You can review the update in your dashboard.",
+		);
+		if (updated.assignedResponder) {
+			await this.notifyResponderStatus(
+				updated.assignedResponder.id,
+				updated,
+				TicketStatus.RESOLVED,
+				"Ticket resolved",
+				"This ticket has been marked as resolved.",
+			);
+		}
 	}
 
 	async closeTicket(ticketId: string, performerById: string, notes?: string) {
@@ -252,6 +691,23 @@ export class TicketsService {
 				trx,
 			);
 		});
+
+		const updated = await this.getTicketById(ticketId);
+		await this.notifyCustomerStatus(
+			updated,
+			TicketStatus.CLOSED,
+			"Your ticket has been closed",
+			"Your incident ticket is now closed. Contact support if you need further help.",
+		);
+		if (updated.assignedResponder) {
+			await this.notifyResponderStatus(
+				updated.assignedResponder.id,
+				updated,
+				TicketStatus.CLOSED,
+				"Ticket closed",
+				"This ticket has been closed.",
+			);
+		}
 	}
 
 	private async updateStatusAndLifecycle(
@@ -277,7 +733,10 @@ export class TicketsService {
 		]);
 	}
 
-	async getTicketLifecycle(ticketId: string, query: PaginationQuery): Promise<PaginatedResponse<ITicketLifecycle>> {
+	async getTicketLifecycle(
+		ticketId: string,
+		query: PaginationQuery,
+	): Promise<PaginatedResponse<ITicketLifecycle>> {
 		return this.ticketLifecyleRepo.getByTicketId(ticketId, query);
 	}
 
@@ -285,10 +744,127 @@ export class TicketsService {
 		return `iRS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
 	}
 
-	async escalationHistory(query: PaginationQuery): Promise<PaginatedResponse<ITicketLifecycle>> {
+	async escalationHistory(
+		query: PaginationQuery,
+	): Promise<PaginatedResponse<ITicketLifecycle>> {
 		return this.ticketLifecyleRepo.getAll(
-			{action: TicketStatus.ESCALATED},
-			query
-		)
+			{ action: TicketStatus.ESCALATED },
+			query,
+		);
+	}
+
+	private toAccountTicketView(ticket: ITicket): ITicket {
+		const { internalNotes: _internalNotes, ...safe } = ticket;
+		return safe;
+	}
+
+	private accountGreetingName(account: Account): string {
+		if (account.individualProfile?.firstName) {
+			return account.individualProfile.firstName;
+		}
+		if (account.organizationProfile?.organizationName) {
+			return account.organizationProfile.organizationName;
+		}
+		return account.email;
+	}
+
+	private accountDisplayName(account: Account): string {
+		if (account.individualProfile?.firstName) {
+			const last = account.individualProfile.lastName?.trim();
+			return last
+				? `${account.individualProfile.firstName} ${last}`
+				: account.individualProfile.firstName;
+		}
+		if (account.organizationProfile?.organizationName) {
+			return account.organizationProfile.organizationName;
+		}
+		return account.email;
+	}
+
+	private async notifyAccount(
+		account: Account,
+		ticket: ITicket,
+		status: TicketStatus,
+		subject: string,
+		intro: string,
+		details?: string,
+	) {
+		await this.emailService.sendTicketStatusUpdateEmail(account.email, {
+			greetingName: this.accountGreetingName(account),
+			intro,
+			ticketId: ticket.ticketId,
+			title: ticket.title,
+			status,
+			subject,
+			headerText: "Ticket Update",
+			details,
+		});
+	}
+
+	private async notifyCustomerStatus(
+		ticket: ITicket,
+		status: TicketStatus,
+		subject: string,
+		intro: string,
+		details?: string,
+	) {
+		if (!ticket.createdFor?.id) return;
+		const account = await this.accountsRepo.findById(ticket.createdFor.id);
+		if (!account) return;
+		await this.notifyAccount(
+			account,
+			ticket,
+			status,
+			subject,
+			intro,
+			details,
+		);
+	}
+
+	private async notifyResponderAssigned(
+		responder: Pick<IUser, "email" | "firstName">,
+		ticket: ITicket,
+		isReassign: boolean,
+	) {
+		const subject = isReassign
+			? "Ticket reassigned to you"
+			: "New ticket assigned to you";
+		const intro = isReassign
+			? "A ticket has been reassigned to you. Please review and continue response."
+			: "A ticket has been assigned to you. Please review and begin response.";
+
+		await this.emailService.sendTicketStatusUpdateEmail(responder.email, {
+			greetingName: responder.firstName || responder.email,
+			intro,
+			ticketId: ticket.ticketId,
+			title: ticket.title,
+			status: ticket.status,
+			subject,
+			headerText: isReassign ? "Ticket Reassigned" : "Ticket Assigned",
+			details: ticket.severity
+				? `Severity: ${ticket.severity}${ticket.tier ? ` | Tier: ${ticket.tier}` : ""}`
+				: undefined,
+		});
+	}
+
+	private async notifyResponderStatus(
+		responderId: string,
+		ticket: ITicket,
+		status: TicketStatus,
+		subject: string,
+		intro: string,
+	) {
+		const responder = await this.usersService.findOne({ id: responderId });
+		if (!responder?.email) return;
+
+		await this.emailService.sendTicketStatusUpdateEmail(responder.email, {
+			greetingName: responder.firstName || responder.email,
+			intro,
+			ticketId: ticket.ticketId,
+			title: ticket.title,
+			status,
+			subject,
+			headerText: "Ticket Update",
+		});
 	}
 }

@@ -118,6 +118,13 @@ async function bootstrap() {
 					return false;
 				}
 				const contentType = String(req.headers["content-type"] || "");
+				const contentLength = String(
+					req.headers["content-length"] || "",
+				);
+				// Skip JSON parser for empty bodies (FE often sends Content-Type: application/json with null/empty body on POST)
+				if (contentLength === "0") {
+					return false;
+				}
 				return (
 					contentType.includes("application/json") &&
 					!contentType.includes("multipart/form-data")

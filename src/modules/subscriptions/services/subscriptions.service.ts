@@ -11,6 +11,12 @@ import { InitializeSubscriptionDto } from "../dto/initialize-subscription.dto";
 import { SubscriptionStatus } from "../entities/subscription.entity";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import { EmailService } from "@/shared/email/service";
+import { TransactionStatus } from "../entities/transaction.entity";
+import { PlanPaymentType } from "../enums/plan-payment-type.enum";
+import { IncidentCreditsRepository } from "../repository/incident-credits.repository";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Tickets } from "@/modules/tickets/entities/ticket.entity";
 
 @Injectable()
 export class SubscriptionsService {
@@ -20,16 +26,23 @@ export class SubscriptionsService {
 		private readonly paystack: PaystackService,
 		private readonly accountsRepo: AccountsRepository,
 		private readonly emailService: EmailService,
+		private readonly incidentCreditsRepo: IncidentCreditsRepository,
+		@InjectRepository(Tickets)
+		private readonly ticketsRepo: Repository<Tickets>,
 	) {}
 
-	async getPlans(accountType?: "individual" | "organization") {
-		const plans = await this.repo.findAllPlans(accountType);
+	async getPlans(
+		accountType?: "individual" | "organization",
+		paymentType?: PlanPaymentType | string,
+	) {
+		const plans = await this.repo.findAllPlans(accountType, paymentType);
 		// Hide internal integration fields (e.g., paystackPlanCode)
 		return plans.map((plan) => ({
 			id: plan.id,
 			name: plan.name,
 			tier: plan.tier,
 			accountType: plan.accountType,
+			paymentType: plan.paymentType,
 			amount: plan.amount,
 			currency: plan.currency,
 			interval: plan.interval,
@@ -61,6 +74,18 @@ export class SubscriptionsService {
 			throw new NotFoundException("Subscription plan not found");
 		}
 
+		if (plan.paymentType === PlanPaymentType.ONE_TIME) {
+			throw new BadRequestException(
+				"This is a pay-as-you-go product. Use POST /subscriptions/initialize-payg instead.",
+			);
+		}
+
+		if (!plan.paystackPlanCode) {
+			throw new BadRequestException(
+				"Subscription plan is missing a Paystack plan code",
+			);
+		}
+
 		// Get account details
 		const account = await this.accountsRepo.findById(accountId);
 		if (!account) {
@@ -80,6 +105,86 @@ export class SubscriptionsService {
 				accountId,
 				planId: plan.id,
 				planName: plan.name,
+				type: "subscription",
+				paymentType: PlanPaymentType.SUBSCRIPTION,
+			},
+		});
+
+		await this.transactionsRepo.createTransaction({
+			accountId,
+			subscriptionId: null,
+			planId: plan.id,
+			transactionReference: paystackResponse.data.reference,
+			status: TransactionStatus.PENDING,
+			amount: amountInKobo,
+			currency: plan.currency,
+			paymentMethod: "Paystack",
+			paystackCustomerCode: null,
+			metadata: {
+				type: "subscription",
+				paymentType: PlanPaymentType.SUBSCRIPTION,
+				planId: plan.id,
+				planName: plan.name,
+			},
+		});
+
+		return {
+			authorizationUrl: paystackResponse.data.authorization_url,
+			reference: paystackResponse.data.reference,
+			accessCode: paystackResponse.data.access_code,
+		};
+	}
+
+	async initializePayg(accountId: string, dto: InitializeSubscriptionDto) {
+		const plan = await this.repo.findPlanById(dto.planId);
+		if (!plan) {
+			throw new NotFoundException("Pay-as-you-go product not found");
+		}
+
+		if (plan.paymentType !== PlanPaymentType.ONE_TIME) {
+			throw new BadRequestException(
+				"Plan is not a pay-as-you-go product. Use POST /subscriptions/initialize for subscriptions.",
+			);
+		}
+
+		if (!plan.active) {
+			throw new BadRequestException("This product is not available");
+		}
+
+		const account = await this.accountsRepo.findById(accountId);
+		if (!account) {
+			throw new NotFoundException("Account not found");
+		}
+
+		const paystackResponse = await this.paystack.initializeTransaction({
+			email: account.email,
+			amount: plan.amount,
+			callback_url: dto.callbackUrl,
+			metadata: {
+				type: "payg",
+				paymentType: PlanPaymentType.ONE_TIME,
+				accountId,
+				planId: plan.id,
+				planName: plan.name,
+				incidentsGranted: plan.maxIncidents ?? 1,
+			},
+		});
+
+		await this.transactionsRepo.createTransaction({
+			accountId,
+			subscriptionId: null,
+			planId: plan.id,
+			transactionReference: paystackResponse.data.reference,
+			status: TransactionStatus.PENDING,
+			amount: plan.amount,
+			currency: plan.currency,
+			paymentMethod: "Paystack",
+			paystackCustomerCode: null,
+			metadata: {
+				type: "payg",
+				paymentType: PlanPaymentType.ONE_TIME,
+				planId: plan.id,
+				incidentsGranted: plan.maxIncidents ?? 1,
 			},
 		});
 
@@ -91,29 +196,88 @@ export class SubscriptionsService {
 	}
 
 	async getSubscriptionStatus(accountId: string) {
-		const subscription =
-			await this.repo.findActiveSubscriptionByAccountId(accountId);
+		const [subscription, paygCreditsAvailable] = await Promise.all([
+			this.repo.findActiveSubscriptionByAccountId(accountId),
+			this.incidentCreditsRepo.countAvailableByAccountId(accountId),
+		]);
+
+		const payg = {
+			paymentType: PlanPaymentType.ONE_TIME as const,
+			creditsAvailable: paygCreditsAvailable,
+		};
 
 		if (!subscription) {
 			return {
 				subscription: null,
-				message: "No active subscription",
+				payg,
+				entitlement: {
+					hasAccess: paygCreditsAvailable > 0,
+					sources: paygCreditsAvailable > 0
+						? ([PlanPaymentType.ONE_TIME] as PlanPaymentType[])
+						: ([] as PlanPaymentType[]),
+				},
+				message:
+					paygCreditsAvailable > 0
+						? "No active subscription; pay-as-you-go credits available"
+						: "No active subscription",
 			};
+		}
+
+		const usedIncidents = await this.ticketsRepo
+			.createQueryBuilder("ticket")
+			.where("ticket.created_for_account_id = :accountId", { accountId })
+			.andWhere("ticket.created_at >= :periodStart", {
+				periodStart: subscription.currentPeriodStart,
+			})
+			.andWhere("ticket.created_at < :periodEnd", {
+				periodEnd: subscription.currentPeriodEnd,
+			})
+			.getCount();
+
+		const maxIncidents = subscription.plan.maxIncidents;
+		const remainingIncidents =
+			maxIncidents === null
+				? null
+				: Math.max(maxIncidents - usedIncidents, 0);
+
+		const sources: PlanPaymentType[] = [PlanPaymentType.SUBSCRIPTION];
+		if (paygCreditsAvailable > 0) {
+			sources.push(PlanPaymentType.ONE_TIME);
 		}
 
 		return {
 			subscription: {
 				id: subscription.id,
 				status: subscription.status,
+				cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
 				plan: {
+					id: subscription.plan.id,
 					name: subscription.plan.name,
 					tier: subscription.plan.tier,
+					accountType: subscription.plan.accountType,
+					paymentType: subscription.plan.paymentType,
+					interval: subscription.plan.interval,
+					amount: Number(subscription.plan.amount),
+					currency: subscription.plan.currency,
 					features: subscription.plan.features,
-					maxIncidents: subscription.plan.maxIncidents,
+					maxIncidents,
+				},
+				usage: {
+					usedIncidents,
+					remainingIncidents,
+					maxIncidents,
 				},
 				currentPeriodStart: subscription.currentPeriodStart,
 				currentPeriodEnd: subscription.currentPeriodEnd,
 				nextBillingDate: subscription.nextBillingDate,
+			},
+			payg,
+			entitlement: {
+				hasAccess:
+					maxIncidents === null ||
+					usedIncidents < maxIncidents ||
+					paygCreditsAvailable > 0,
+				sources,
 			},
 		};
 	}

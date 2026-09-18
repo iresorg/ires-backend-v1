@@ -1,4 +1,5 @@
 import { Role } from "@/modules/users/enums/role.enum";
+import { TicketEntitlementSource } from "../entities/ticket.entity";
 
 export interface VictimInformation {
 	name: string;
@@ -32,7 +33,20 @@ export interface ContactInformation {
 	address: string;
 }
 
-export type ITicketSummary = Pick<ITicket, "ticketId" | "title" | "tier" | "status" | "severity" | "createdAt" | "updatedAt" | "category" | "subCategory">;
+export type ITicketSummary = Pick<
+	ITicket,
+	| "ticketId"
+	| "title"
+	| "tier"
+	| "status"
+	| "severity"
+	| "createdAt"
+	| "updatedAt"
+	| "category"
+	| "subCategory"
+	| "createdFor"
+	| "entitlementSource"
+>;
 
 export interface ITicket {
 	ticketId: string;
@@ -55,6 +69,13 @@ export interface ITicket {
 		lastName?: string;
 		role: Role;
 	};
+	createdFor?: {
+		id: string;
+		email: string;
+		role: string;
+		status: string;
+	};
+	entitlementSource?: TicketEntitlementSource | null;
 	assignedResponder?: {
 		id: string;
 		firstName: string;
@@ -109,12 +130,18 @@ export type ITicketCreate = Omit<
 	| "updatedAt"
 	| "severity"
 	| "createdBy"
+	| "createdFor"
 	| "tier"
 	| "category"
+	| "entitlementSource"
 > & {
+	ticketId: string;
 	createdById: string;
+	createdForAccountId: string;
 	categoryId: string;
 	subCategoryId?: string;
+	entitlementSource?: TicketEntitlementSource;
+	incidentCreditId?: string;
 };
 
 export type ITicketUpdate = Partial<ITicket>;

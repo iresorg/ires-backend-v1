@@ -19,11 +19,13 @@ import SubscriptionActivated from "@/shared/email/templates/SubscriptionActivate
 import SubscriptionCancelled from "@/shared/email/templates/SubscriptionCancelled";
 import PaymentFailed from "@/shared/email/templates/PaymentFailed";
 import SubscriptionEnded from "@/shared/email/templates/SubscriptionEnded";
+import TicketStatusUpdate from "@/shared/email/templates/TicketStatusUpdate";
 
 export const templates = {
 	NewUser,
 	NewTicket,
 	TicketEscalated,
+	TicketStatusUpdate,
 	VerifyEmail,
 	PasswordReset,
 	AccountWelcome,

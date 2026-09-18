@@ -1,7 +1,8 @@
-import { IsOptional, IsString, IsEnum, IsUUID } from "class-validator";
+import { IsOptional, IsString, IsEnum, IsUUID, IsIn } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { SubscriptionStatus } from "@/modules/subscriptions/entities/subscription.entity";
+import { PlanPaymentType } from "@/modules/subscriptions/enums/plan-payment-type.enum";
 
 export class SubscribersQueryDto {
 	@ApiPropertyOptional({
@@ -13,7 +14,7 @@ export class SubscribersQueryDto {
 	search?: string;
 
 	@ApiPropertyOptional({
-		description: "Filter by subscription status",
+		description: "Filter by subscription status (recurring only)",
 		enum: SubscriptionStatus,
 		example: SubscriptionStatus.ACTIVE,
 	})
@@ -28,6 +29,16 @@ export class SubscribersQueryDto {
 	@IsOptional()
 	@IsUUID()
 	planId?: string;
+
+	@ApiPropertyOptional({
+		description:
+			"subscription = recurring subscribers. one_time = pay-as-you-go purchasers/credits.",
+		enum: PlanPaymentType,
+		example: PlanPaymentType.SUBSCRIPTION,
+	})
+	@IsOptional()
+	@IsIn(Object.values(PlanPaymentType))
+	paymentType?: PlanPaymentType;
 
 	@ApiPropertyOptional({
 		description: "Page number (starts from 1)",

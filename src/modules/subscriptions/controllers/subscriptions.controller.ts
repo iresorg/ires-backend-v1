@@ -39,14 +39,25 @@ export class SubscriptionsController {
 		enum: ["individual", "organization"],
 		description: "Filter plans by account type",
 	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
+		description:
+			"subscription = recurring plans; one_time = pay-as-you-go products",
+	})
 	@ApiResponse({
 		status: 200,
 		description: "Plans retrieved successfully",
 	})
 	async getPlans(
 		@Query("accountType") accountType?: "individual" | "organization",
+		@Query("paymentType") paymentType?: string,
 	) {
-		return await this.subscriptionsService.getPlans(accountType);
+		return await this.subscriptionsService.getPlans(
+			accountType,
+			paymentType,
+		);
 	}
 
 	@UseGuards(AccountsAuthGuard)
@@ -91,61 +102,32 @@ export class SubscriptionsController {
 	}
 
 	@UseGuards(AccountsAuthGuard)
+	@Post("initialize-payg")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: "Initialize pay-as-you-go (one-time) payment",
+		description:
+			"One-time Paystack charge for a single incident credit. Does not create a recurring subscription.",
+	})
+	@ApiBody({ type: InitializeSubscriptionDto })
+	@ApiResponse({
+		status: 200,
+		description: "PAYG payment initialized successfully",
+	})
+	async initializePayg(@Body() dto: InitializeSubscriptionDto, @Req() req: any) {
+		return await this.subscriptionsService.initializePayg(req.user.id, dto);
+	}
+
+	@UseGuards(AccountsAuthGuard)
 	@Get("status")
 	@ApiOperation({
-		summary: "Get current subscription status",
-		description: "Get the active subscription details for the current user",
+		summary: "Get billing entitlement status",
+		description:
+			"Returns active subscription (with paymentType + usage), pay-as-you-go credits, and overall entitlement. Account JWT required.",
 	})
 	@ApiResponse({
 		status: 200,
-		description: "Subscription status retrieved successfully",
-		schema: {
-			type: "object",
-			properties: {
-				subscription: {
-					type: "object",
-					properties: {
-						id: { type: "string" },
-						status: { type: "string", example: "active" },
-						plan: {
-							type: "object",
-							properties: {
-								name: { type: "string" },
-								tier: { type: "number" },
-								features: { type: "array" },
-								maxIncidents: {
-									type: "number",
-									nullable: true,
-								},
-							},
-						},
-						currentPeriodStart: {
-							type: "string",
-							format: "date-time",
-						},
-						currentPeriodEnd: {
-							type: "string",
-							format: "date-time",
-						},
-						nextBillingDate: {
-							type: "string",
-							format: "date-time",
-						},
-					},
-				},
-			},
-		},
-	})
-	@ApiResponse({
-		status: 200,
-		description: "No active subscription",
-		schema: {
-			type: "object",
-			properties: {
-				subscription: { type: "null" },
-				message: { type: "string", example: "No active subscription" },
-			},
-		},
+		description: "Status retrieved successfully",
 	})
 	async getSubscriptionStatus(@Req() req: any) {
 		return await this.subscriptionsService.getSubscriptionStatus(

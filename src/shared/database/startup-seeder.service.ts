@@ -24,6 +24,7 @@ export class StartupSeederService implements OnModuleInit {
 			this.logger.log("Running startup seeder...");
 			await this.seedSuperAdmin();
 			await this.seedSubscriptionPlans();
+			await this.ensurePaygPlans();
 			this.logger.log("Startup seeder completed successfully");
 		} catch (error) {
 			this.logger.error(
@@ -63,31 +64,41 @@ export class StartupSeederService implements OnModuleInit {
 
 	private async seedSubscriptionPlans() {
 		const planRepository = this.dataSource.getRepository(SubscriptionPlan);
+		const existingCount = await planRepository.count();
+		if (existingCount > 0) {
+			this.logger.log(
+				"Subscription plans already exist; skipping seed so admin edits are preserved",
+			);
+			return;
+		}
 
 		for (const planData of SUBSCRIPTION_PLANS) {
-			const existingPlan = await planRepository.findOne({
-				where: { paystackPlanCode: planData.paystackPlanCode },
-			});
+			const plan = planRepository.create(planData);
+			await planRepository.save(plan);
+			this.logger.log(`Created subscription plan: ${planData.name}`);
+		}
+	}
 
-			if (existingPlan) {
-				await planRepository.update(existingPlan.id, {
+	/** Ensures PAYG products exist even when monthly plans were seeded earlier. */
+	private async ensurePaygPlans() {
+		const planRepository = this.dataSource.getRepository(SubscriptionPlan);
+		const paygPlans = SUBSCRIPTION_PLANS.filter(
+			(plan) => plan.paymentType === "one_time",
+		);
+
+		for (const planData of paygPlans) {
+			const existing = await planRepository.findOne({
+				where: {
 					name: planData.name,
-					tier: planData.tier,
 					accountType: planData.accountType,
-					amount: planData.amount,
-					currency: planData.currency,
-					interval: planData.interval,
-					description: planData.description,
-					features: planData.features,
-					maxIncidents: planData.maxIncidents,
-					active: planData.active,
-				});
-				this.logger.log(`Updated subscription plan: ${planData.name}`);
-			} else {
-				const plan = planRepository.create(planData);
-				await planRepository.save(plan);
-				this.logger.log(`Created subscription plan: ${planData.name}`);
-			}
+					paymentType: planData.paymentType,
+				},
+			});
+			if (existing) continue;
+
+			const plan = planRepository.create(planData);
+			await planRepository.save(plan);
+			this.logger.log(`Created PAYG product: ${planData.name}`);
 		}
 	}
 }

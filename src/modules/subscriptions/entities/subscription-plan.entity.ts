@@ -1,5 +1,6 @@
 import { Entity, Column, Index } from "typeorm";
 import { BaseEntity } from "@/shared/entity/base.entity";
+import { PlanPaymentType } from "../enums/plan-payment-type.enum";
 
 @Entity({ name: "subscription_plans" })
 export class SubscriptionPlan extends BaseEntity {
@@ -16,18 +17,27 @@ export class SubscriptionPlan extends BaseEntity {
 	accountType: "individual" | "organization";
 
 	@Index()
+	@Column({
+		type: "varchar",
+		name: "payment_type",
+		default: PlanPaymentType.SUBSCRIPTION,
+	})
+	paymentType: PlanPaymentType;
+
+	@Index()
 	@Column({ type: "bigint" })
 	amount: number;
 
 	@Column({ type: "varchar", default: "NGN" })
 	currency: string;
 
-	@Column({ type: "varchar", default: "monthly" })
-	interval: string;
+	/** Billing cadence for subscriptions (e.g. monthly). Unused for one_time. */
+	@Column({ type: "varchar", default: "monthly", nullable: true })
+	interval: string | null;
 
 	@Index()
-	@Column({ type: "varchar", name: "paystack_plan_code" })
-	paystackPlanCode: string;
+	@Column({ type: "varchar", name: "paystack_plan_code", nullable: true })
+	paystackPlanCode: string | null;
 
 	@Column({ type: "text" })
 	description: string;

@@ -12,7 +12,20 @@ import {
 	ITicketCreate,
 	ContactInformation,
 } from "../interfaces/ticket.interface";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
+
+function parseJsonField({ value }: { value: unknown }) {
+	if (value === undefined || value === null || value === "") return undefined;
+	if (typeof value === "object") return value;
+	if (typeof value === "string") {
+		try {
+			return JSON.parse(value);
+		} catch {
+			return value;
+		}
+	}
+	return value;
+}
 
 class VictimInformationDto implements VictimInformation {
 	@ApiProperty({ description: "Victim's name" })
@@ -63,7 +76,15 @@ class ContactInformationDto implements ContactInformation {
 }
 
 export class CreateTicketDto
-	implements Omit<ITicketCreate, "ticketId" | "createdById">
+	implements
+		Omit<
+			ITicketCreate,
+			| "ticketId"
+			| "createdById"
+			| "createdForAccountId"
+			| "entitlementSource"
+			| "incidentCreditId"
+		>
 {
 	@ApiProperty({ description: "Ticket title" })
 	@IsNotEmpty()
@@ -93,11 +114,16 @@ export class CreateTicketDto
 	@IsString()
 	reporterName: string;
 
-	@ApiProperty({ description: "Contact information" })
+	@ApiProperty({
+		description:
+			"Contact information object: { email, phone, address }. Optional. Multipart: send JSON string.",
+		required: false,
+	})
 	@IsOptional()
+	@Transform(parseJsonField)
 	@ValidateNested()
 	@Type(() => ContactInformationDto)
-	contactInformation: Partial<ContactInformationDto>;
+	contactInformation?: Partial<ContactInformationDto>;
 
 	@ApiProperty({ description: "Internal notes", required: false })
 	@IsOptional()
@@ -105,11 +131,13 @@ export class CreateTicketDto
 	internalNotes?: string;
 
 	@ApiProperty({
-		description: "Victim information",
+		description:
+			"Victim information object: { name, phone, address, email, age?, gender? }. Optional. Multipart: send JSON string.",
 		required: false,
 		type: VictimInformationDto,
 	})
 	@IsOptional()
+	@Transform(parseJsonField)
 	@ValidateNested()
 	@Type(() => VictimInformationDto)
 	victimInformation?: Partial<VictimInformationDto>;
@@ -131,4 +159,11 @@ export class CreateTicketDto
 	@IsOptional()
 	@IsString()
 	subCategoryId?: string;
+
+	@ApiProperty({
+		description:
+			"Customer account this ticket is created for (must have active subscription or unused PAYG credit)",
+	})
+	@IsUUID()
+	accountId: string;
 }

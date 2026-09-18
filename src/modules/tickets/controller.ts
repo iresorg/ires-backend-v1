@@ -34,7 +34,7 @@ import { Role } from "../users/enums/role.enum";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { GetTicketDto } from "./dto/get-ticket.dto";
-import { PaginatedResponse } from "@/shared/utils/pagination";
+import { EligibleAccountsQueryDto } from "./dto/eligible-accounts.dto";
 import { PaginationQuery } from "@/shared/dto/pagination.dto";
 import { FilesInterceptor } from "@nestjs/platform-express";
 
@@ -55,6 +55,7 @@ export class TicketsController {
 				"location",
 				"reporterName",
 				"categoryId",
+				"accountId",
 			],
 			properties: {
 				title: { type: "string" },
@@ -64,6 +65,11 @@ export class TicketsController {
 				reporterName: { type: "string" },
 				categoryId: { type: "string" },
 				subCategoryId: { type: "string" },
+				accountId: {
+					type: "string",
+					description:
+						"Customer account id (createdFor). Must have active subscription or unused PAYG credit.",
+				},
 				internalNotes: { type: "string" },
 				attachments: {
 					type: "array",
@@ -80,14 +86,44 @@ export class TicketsController {
 		@Body() createTicketDto: CreateTicketDto,
 		@Req() req: AuthRequest,
 	): Promise<{ message: string; data: ITicket }> {
-		const data = await this.ticketsService.createTicket({
-			...createTicketDto,
-			createdById: req.user.id,
-		}, attachments);
+		const data = await this.ticketsService.createTicket(
+			{
+				...createTicketDto,
+				createdById: req.user.id,
+			},
+			attachments,
+		);
 
 		return {
 			message: "Ticket created successfully",
 			data,
+		};
+	}
+
+	@ApiOperation({
+		summary: "Check if a customer account can have a ticket created",
+	})
+	@ApiResponse({ status: 200, description: "Eligibility checked" })
+	@Get("eligibility/:accountId")
+	async getAccountEligibility(@Param("accountId") accountId: string) {
+		const data = await this.ticketsService.getAccountEligibility(accountId);
+		return {
+			message: "Eligibility checked successfully",
+			data,
+		};
+	}
+
+	@ApiOperation({
+		summary:
+			"List customer accounts eligible for ticket create (active subscription with remaining incidents, or unused PAYG credit)",
+	})
+	@ApiResponse({ status: 200, description: "Eligible accounts fetched" })
+	@Get("eligible-accounts")
+	async getEligibleAccounts(@Query() query: EligibleAccountsQueryDto) {
+		const data = await this.ticketsService.getEligibleAccounts(query);
+		return {
+			message: "Eligible accounts fetched successfully",
+			...data,
 		};
 	}
 
