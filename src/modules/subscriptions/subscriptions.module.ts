@@ -42,6 +42,7 @@ import { EmailModule } from "@/shared/email/module";
 	exports: [
 		SubscriptionsService,
 		SubscriptionsRepository,
+		TransactionsRepository,
 		PaystackService,
 		IncidentCreditsRepository,
 	],

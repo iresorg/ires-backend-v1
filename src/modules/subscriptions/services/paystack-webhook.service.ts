@@ -74,7 +74,89 @@ export class PaystackWebhookService {
 				this.logger.log(`Unhandled event: ${event}`);
 		}
 
+		await this.markWebhookProcessed(signature);
 		return { status: "success" };
+	}
+
+	private async markWebhookProcessed(paystackEventId?: string) {
+		if (!paystackEventId) return;
+		try {
+			await this.paystackEventRepo.update(
+				{ paystackEventId },
+				{ processed: true, processedAt: new Date() },
+			);
+		} catch (error) {
+			this.logger.warn("Failed to mark webhook event processed", error);
+		}
+	}
+
+	private async resolveAccountFromCharge(data: any) {
+		const metadata = data.metadata || {};
+		if (metadata.accountId) {
+			const byId = await this.accountsRepo.findById(metadata.accountId);
+			if (byId) return byId;
+		}
+		const email = data.customer?.email;
+		if (email) {
+			return this.accountsRepo.findByEmail(email);
+		}
+		return null;
+	}
+
+	private async persistSuccessfulCharge(params: {
+		data: any;
+		accountId: string;
+		subscriptionId?: string | null;
+		planId?: string | null;
+		extraMetadata?: Record<string, any>;
+	}) {
+		const { data, accountId, subscriptionId, planId, extraMetadata } =
+			params;
+		const reference = data.reference;
+		if (!reference) {
+			this.logger.warn("Cannot persist charge without reference");
+			return null;
+		}
+
+		const metadata = data.metadata || {};
+		const paymentType =
+			metadata.type === "payg" ||
+			metadata.paymentType === "payg" ||
+			metadata.paymentType === "one_time"
+				? "payg"
+				: metadata.type === "subscription" ||
+					  metadata.paymentType === "subscription"
+					? "subscription"
+					: subscriptionId
+						? "subscription"
+						: "subscription";
+
+		const { transaction, created } =
+			await this.transactionsRepo.upsertByReference({
+				accountId,
+				subscriptionId: subscriptionId ?? null,
+				planId: planId ?? metadata.planId ?? null,
+				transactionReference: reference,
+				status: TransactionStatus.SUCCESS,
+				amount: data.amount || 0,
+				currency: data.currency || "NGN",
+				paymentMethod: data.authorization?.channel || "Paystack",
+				paystackCustomerCode: data.customer?.customer_code || null,
+				metadata: {
+					type: paymentType,
+					paymentType:
+						paymentType === "payg" ? "one_time" : "subscription",
+					paystackTransactionId: data.id,
+					authorizationCode: data.authorization?.authorization_code,
+					paidAt: data.paid_at || null,
+					...(extraMetadata || {}),
+				},
+			});
+
+		this.logger.log(
+			`Transaction ${reference} ${created ? "created" : "updated"} as SUCCESS`,
+		);
+		return transaction;
 	}
 
 	private async logWebhookEvent(
@@ -103,24 +185,23 @@ export class PaystackWebhookService {
 	private async handleChargeSuccess(data: any) {
 		const metadata = data.metadata || {};
 		const isPayg =
-			metadata.type === "payg" || metadata.paymentType === "payg";
+			metadata.type === "payg" ||
+			metadata.paymentType === "payg" ||
+			metadata.paymentType === "one_time";
 
 		if (isPayg) {
 			await this.handlePaygChargeSuccess(data);
 			return;
 		}
 
-		// Successful payment - extend subscription
 		const subscriptionCode = data.subscription?.subscription_code;
 		const transactionReference = data.reference;
 		const customerCode = data.customer?.customer_code;
 
-		// Try to find subscription by subscription_code first (for renewals)
 		let subscription = subscriptionCode
 			? await this.subscriptionsRepo.findByPaystackCode(subscriptionCode)
 			: null;
 
-		// If not found and we have a reference, try finding by transaction reference (for first payments)
 		if (!subscription && transactionReference) {
 			subscription =
 				await this.subscriptionsRepo.findByTransactionReference(
@@ -128,7 +209,6 @@ export class PaystackWebhookService {
 				);
 		}
 
-		// If still not found, try finding by customer code (for first payments before subscription.create)
 		if (!subscription && customerCode) {
 			subscription =
 				await this.subscriptionsRepo.findByPaystackCustomerCode(
@@ -138,52 +218,24 @@ export class PaystackWebhookService {
 
 		if (!subscription) {
 			this.logger.warn(
-				`Could not find subscription for charge.success event. Reference: ${transactionReference}, Subscription Code: ${subscriptionCode}, Customer Code: ${customerCode}`,
+				`Could not find subscription for charge.success. Reference: ${transactionReference}`,
 			);
-			// Subscription not found - create transaction anyway (subscription.create will link it later)
-			if (transactionReference && data.customer?.email) {
-				const customerEmail = data.customer.email;
-				const account =
-					await this.accountsRepo.findByEmail(customerEmail);
-				if (account) {
-					this.logger.log(
-						`Creating transaction ${transactionReference} without subscription link. Will be linked when subscription is created.`,
-					);
-					try {
-						const existingTransaction =
-							await this.transactionsRepo.findByReference(
-								transactionReference,
-							);
-						if (!existingTransaction) {
-							await this.transactionsRepo.createTransaction({
-								accountId: account.id,
-								subscriptionId: null, // Will be linked later
-								planId: null, // Will be linked later
-								transactionReference,
-								status: TransactionStatus.SUCCESS,
-								amount: data.amount || 0,
-								currency: data.currency || "NGN",
-								paymentMethod:
-									data.authorization?.channel || "Paystack",
-								paystackCustomerCode: customerCode,
-								metadata: {
-									paystackTransactionId: data.id,
-									isRenewal: false,
-									authorizationCode:
-										data.authorization?.authorization_code,
-									pendingSubscriptionLink: true,
-								},
-							});
-							this.logger.log(
-								`Transaction ${transactionReference} created successfully (pending subscription link)`,
-							);
-						}
-					} catch (error: any) {
-						this.logger.error(
-							`Failed to create transaction without subscription: ${error.message || error}`,
-						);
-					}
-				}
+			const account = await this.resolveAccountFromCharge(data);
+			if (account && transactionReference) {
+				await this.persistSuccessfulCharge({
+					data,
+					accountId: account.id,
+					subscriptionId: null,
+					planId: metadata.planId ?? null,
+					extraMetadata: {
+						pendingSubscriptionLink: true,
+						isRenewal: false,
+					},
+				});
+			} else {
+				this.logger.error(
+					`charge.success could not be persisted locally. reference=${transactionReference} email=${data.customer?.email}`,
+				);
 			}
 			return;
 		}
@@ -192,12 +244,10 @@ export class PaystackWebhookService {
 			`Found subscription ${subscription.id} for charge.success event`,
 		);
 
-		// Update billing dates
 		const now = new Date();
 		const nextMonth = new Date(now);
 		nextMonth.setMonth(nextMonth.getMonth() + 1);
 
-		// Update billing dates and, if present, persist Paystack subscription identifiers
 		const updateData: Partial<Subscription> = {
 			currentPeriodStart: now,
 			currentPeriodEnd: nextMonth,
@@ -227,63 +277,29 @@ export class PaystackWebhookService {
 			updateData,
 		);
 
-		// Create or update transaction record (for both first payments and renewals)
 		if (transactionReference) {
-			this.logger.log(
-				`Creating/updating transaction for reference: ${transactionReference}`,
-			);
-			const existingTransaction =
-				await this.transactionsRepo.findByReference(
-					transactionReference,
-				);
-			if (!existingTransaction) {
-				// Determine if this is a renewal or first payment
-				const isRenewal = !!subscriptionCode;
-				this.logger.log(
-					`Creating new transaction ${transactionReference} (isRenewal: ${isRenewal})`,
-				);
-				await this.transactionsRepo.createTransaction({
-					accountId: subscription.accountId,
-					subscriptionId: subscription.id,
-					planId: subscription.planId,
-					transactionReference,
-					status: TransactionStatus.SUCCESS,
-					amount: data.amount || subscription.plan.amount,
-					currency: data.currency || subscription.plan.currency,
-					paymentMethod: data.authorization?.channel || "Paystack",
-					paystackCustomerCode:
-						subscription.paystackCustomerCode || customerCode,
-					metadata: {
-						paystackTransactionId: data.id,
-						isRenewal,
-						authorizationCode:
-							data.authorization?.authorization_code,
-					},
-				});
+			const isRenewal = !!subscriptionCode;
+			await this.persistSuccessfulCharge({
+				data,
+				accountId: subscription.accountId,
+				subscriptionId: subscription.id,
+				planId: subscription.planId,
+				extraMetadata: {
+					isRenewal,
+					type: "subscription",
+					paymentType: "subscription",
+				},
+			});
 
-				this.logger.log(
-					`Transaction ${transactionReference} created successfully`,
-				);
-
-				// Update subscription metadata with transaction reference if not set
-				if (!subscription.metadata?.transactionReference) {
-					await this.subscriptionsRepo.updateSubscription(
-						subscription.id,
-						{
-							metadata: {
-								...subscription.metadata,
-								transactionReference,
-							},
+			if (!subscription.metadata?.transactionReference) {
+				await this.subscriptionsRepo.updateSubscription(
+					subscription.id,
+					{
+						metadata: {
+							...subscription.metadata,
+							transactionReference,
 						},
-					);
-				}
-			} else {
-				this.logger.log(
-					`Transaction ${transactionReference} already exists, updating status`,
-				);
-				await this.transactionsRepo.updateTransactionStatus(
-					transactionReference,
-					TransactionStatus.SUCCESS,
+					},
 				);
 			}
 		} else {
@@ -300,7 +316,6 @@ export class PaystackWebhookService {
 	private async handlePaygChargeSuccess(data: any) {
 		const transactionReference = data.reference;
 		const metadata = data.metadata || {};
-		const accountId = metadata.accountId;
 		const planId = metadata.planId;
 		const incidentsGranted = Number(metadata.incidentsGranted ?? 1);
 
@@ -309,14 +324,9 @@ export class PaystackWebhookService {
 			return;
 		}
 
-		let account =
-			(accountId && (await this.accountsRepo.findById(accountId))) ||
-			null;
-		if (!account && data.customer?.email) {
-			account = await this.accountsRepo.findByEmail(data.customer.email);
-		}
+		const account = await this.resolveAccountFromCharge(data);
 		if (!account) {
-			this.logger.warn(
+			this.logger.error(
 				`PAYG charge.success could not resolve account. Reference: ${transactionReference}`,
 			);
 			return;
@@ -326,42 +336,19 @@ export class PaystackWebhookService {
 			? await this.subscriptionsRepo.findPlanById(planId)
 			: null;
 
-		let transaction =
-			await this.transactionsRepo.findByReference(transactionReference);
+		const transaction = await this.persistSuccessfulCharge({
+			data,
+			accountId: account.id,
+			subscriptionId: null,
+			planId: plan?.id ?? planId ?? null,
+			extraMetadata: {
+				type: "payg",
+				paymentType: "one_time",
+				incidentsGranted,
+			},
+		});
 
-		if (!transaction) {
-			transaction = await this.transactionsRepo.createTransaction({
-				accountId: account.id,
-				subscriptionId: null,
-				planId: plan?.id ?? planId ?? null,
-				transactionReference,
-				status: TransactionStatus.SUCCESS,
-				amount: data.amount || plan?.amount || 0,
-				currency: data.currency || plan?.currency || "NGN",
-				paymentMethod: data.authorization?.channel || "Paystack",
-				paystackCustomerCode: data.customer?.customer_code || null,
-				metadata: {
-					type: "payg",
-					paystackTransactionId: data.id,
-					incidentsGranted,
-				},
-			});
-		} else {
-			await this.transactionsRepo.updateTransaction(transaction.id, {
-				status: TransactionStatus.SUCCESS,
-				planId: plan?.id ?? transaction.planId,
-				metadata: {
-					...transaction.metadata,
-					type: "payg",
-					paystackTransactionId: data.id,
-					incidentsGranted,
-				},
-			});
-			transaction =
-				(await this.transactionsRepo.findByReference(
-					transactionReference,
-				)) || transaction;
-		}
+		if (!transaction) return;
 
 		const existingCredit =
 			await this.incidentCreditsRepo.findByTransactionId(transaction.id);

@@ -37,6 +37,7 @@ import { TicketLifecycle } from "../tickets/entities/ticket-lifecycle.entity";
 import { Role } from "../users/enums/role.enum";
 import { TicketStatus } from "../tickets/interfaces/ticket.interface";
 import { SubscriptionsRepository } from "../subscriptions/repository/subscriptions.repository";
+import { TransactionsRepository } from "../subscriptions/repository/transactions.repository";
 import { PaystackService } from "../subscriptions/services/paystack.service";
 import { PlanPaymentType } from "../subscriptions/enums/plan-payment-type.enum";
 import {
@@ -68,6 +69,7 @@ export class AdminService {
 		@InjectRepository(SubscriptionTransaction)
 		private readonly transactions: Repository<SubscriptionTransaction>,
 		private readonly subscriptionsRepo: SubscriptionsRepository,
+		private readonly transactionsRepo: TransactionsRepository,
 		private readonly paystack: PaystackService,
 	) {}
 
@@ -563,56 +565,18 @@ export class AdminService {
 				error?.message || "Failed to fetch Paystack transactions";
 		}
 
-		const usePaystack =
-			paystackPeriod !== null &&
-			(paystackPeriod.successCount > 0 || local.revenueTotal === 0);
-
-		const revenueTotal = usePaystack
-			? paystackPeriod!.revenueTotal
-			: local.revenueTotal;
-		const revenueSubscription = usePaystack
-			? paystackPeriod!.revenueSubscription
-			: local.revenueSubscription;
-		const revenuePayg = usePaystack
-			? paystackPeriod!.revenuePayg
-			: local.revenuePayg;
-		const successCount = usePaystack
-			? paystackPeriod!.successCount
-			: local.successCount;
-		const failedCount = usePaystack
-			? paystackPeriod!.failedCount
-			: local.failedCount;
-		const pendingCount = usePaystack
-			? paystackPeriod!.pendingCount
-			: local.pendingCount;
-		const revenueByMonth = usePaystack
-			? this.buildMonthSeries(months).map((month) => {
-					const bucket = paystackPeriod!.byMonth.get(month) ?? {
-						subscription: 0,
-						payg: 0,
-						total: 0,
-					};
-					return { month, ...bucket };
-				})
-			: local.revenueByMonth;
-
-		const recentTransactions =
-			local.recentTransactions.length > 0
-				? local.recentTransactions
-				: (paystackPeriod?.recent ?? []);
-
 		return {
 			currency: "NGN",
 			range: { from, to },
-			revenueSource: usePaystack ? "paystack" : "local",
-			note: "Paystack balance is wallet cash (after fees, before/after settlements). Period revenue is successful charges in the selected range. They are not the same number.",
+			revenueSource: "local",
+			note: "Revenue cards use the local payment ledger (source of truth). Paystack period totals are for reconciliation only. Wallet balance is separate from period revenue. Run POST /admin/financials/sync-paystack to backfill missing local rows.",
 			summary: {
-				revenueTotal,
-				revenueSubscription,
-				revenuePayg,
-				successCount,
-				failedCount,
-				pendingCount,
+				revenueTotal: local.revenueTotal,
+				revenueSubscription: local.revenueSubscription,
+				revenuePayg: local.revenuePayg,
+				successCount: local.successCount,
+				failedCount: local.failedCount,
+				pendingCount: local.pendingCount,
 				mrr: mrrData.mrr,
 				activeSubscribers: mrrData.activeSubscribers,
 				paygCreditsAvailable,
@@ -633,12 +597,136 @@ export class AdminService {
 						successCount: paystackPeriod.successCount,
 						failedCount: paystackPeriod.failedCount,
 						pendingCount: paystackPeriod.pendingCount,
+						gapVsLocal:
+							paystackPeriod.revenueTotal - local.revenueTotal,
 					}
 				: null,
 			paystackError,
-			revenueByMonth,
-			recentTransactions,
+			revenueByMonth: local.revenueByMonth,
+			recentTransactions: local.recentTransactions,
 		};
+	}
+
+	async syncPaystackTransactions(query: {
+		from?: string;
+		to?: string;
+	}) {
+		const { from, to } = this.resolveDateRange(query.from, query.to);
+		const fromStr = this.formatPaystackDate(from);
+		const toStr = this.formatPaystackDate(to);
+
+		let imported = 0;
+		let updated = 0;
+		let skipped = 0;
+		const errors: string[] = [];
+
+		let page = 1;
+		const maxPages = 50;
+
+		while (page <= maxPages) {
+			const response = await this.paystack.listTransactions({
+				page,
+				perPage: 100,
+				from: fromStr,
+				to: toStr,
+			});
+			const rows: any[] = Array.isArray(response?.data)
+				? response.data
+				: [];
+			if (!rows.length) break;
+
+			for (const row of rows) {
+				const reference = row.reference;
+				if (!reference) {
+					skipped += 1;
+					continue;
+				}
+
+				const status = String(row.status || "").toLowerCase();
+				const mappedStatus =
+					status === "success"
+						? TransactionStatus.SUCCESS
+						: status === "failed"
+							? TransactionStatus.FAILED
+							: TransactionStatus.PENDING;
+
+				try {
+					const account = await this.resolveAccountForPaystackRow(row);
+					if (!account) {
+						skipped += 1;
+						errors.push(
+							`No local account for ${reference} (${row.customer?.email || "no email"})`,
+						);
+						continue;
+					}
+
+					const paymentType = this.resolvePaystackPaymentType(row);
+					const meta = row.metadata || {};
+					const { created } =
+						await this.transactionsRepo.upsertByReference({
+							accountId: account.id,
+							subscriptionId: null,
+							planId: meta.planId || null,
+							transactionReference: reference,
+							status: mappedStatus,
+							amount: this.toNumber(row.amount),
+							currency: row.currency || "NGN",
+							paymentMethod:
+								row.authorization?.channel || "Paystack",
+							paystackCustomerCode:
+								row.customer?.customer_code || null,
+							metadata: {
+								type:
+									paymentType === PlanPaymentType.ONE_TIME
+										? "payg"
+										: "subscription",
+								paymentType,
+								paystackTransactionId: row.id,
+								paidAt: row.paid_at || null,
+								syncedFromPaystack: true,
+								syncedAt: new Date().toISOString(),
+							},
+						});
+
+					if (created) imported += 1;
+					else updated += 1;
+				} catch (error: any) {
+					skipped += 1;
+					errors.push(
+						`${reference}: ${error?.message || "upsert failed"}`,
+					);
+				}
+			}
+
+			const pageCount = response?.meta?.pageCount;
+			if (pageCount && page >= pageCount) break;
+			if (rows.length < 100) break;
+			page += 1;
+		}
+
+		return {
+			from,
+			to,
+			imported,
+			updated,
+			skipped,
+			errors: errors.slice(0, 50),
+			message:
+				"Local ledger synced from Paystack. Refresh financials overview — revenue now uses local rows.",
+		};
+	}
+
+	private async resolveAccountForPaystackRow(row: any) {
+		const meta = row?.metadata || {};
+		if (meta.accountId) {
+			const byId = await this.accountsRepo.findById(meta.accountId);
+			if (byId) return byId;
+		}
+		const email = row?.customer?.email;
+		if (email) {
+			return this.accountsRepo.findByEmail(email);
+		}
+		return null;
 	}
 
 	private async computeLocalFinancials(

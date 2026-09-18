@@ -18,6 +18,43 @@ export class TransactionsRepository {
 		return await this.transactions.save(transaction);
 	}
 
+	async upsertByReference(
+		data: Partial<SubscriptionTransaction> & {
+			transactionReference: string;
+			accountId: string;
+		},
+	): Promise<{ transaction: SubscriptionTransaction; created: boolean }> {
+		const existing = await this.findByReference(data.transactionReference);
+		if (existing) {
+			await this.updateTransaction(existing.id, {
+				status: data.status ?? existing.status,
+				amount: data.amount ?? existing.amount,
+				currency: data.currency ?? existing.currency,
+				subscriptionId:
+					data.subscriptionId !== undefined
+						? data.subscriptionId
+						: existing.subscriptionId,
+				planId: data.planId !== undefined ? data.planId : existing.planId,
+				paymentMethod: data.paymentMethod ?? existing.paymentMethod,
+				paystackCustomerCode:
+					data.paystackCustomerCode !== undefined
+						? data.paystackCustomerCode
+						: existing.paystackCustomerCode,
+				metadata: {
+					...(existing.metadata || {}),
+					...(data.metadata || {}),
+				},
+			});
+			const transaction =
+				(await this.findByReference(data.transactionReference)) ||
+				existing;
+			return { transaction, created: false };
+		}
+
+		const transaction = await this.createTransaction(data);
+		return { transaction, created: true };
+	}
+
 	async findByAccountId(
 		accountId: string,
 	): Promise<SubscriptionTransaction[]> {

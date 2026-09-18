@@ -110,6 +110,24 @@ export class SubscriptionsService {
 			},
 		});
 
+		await this.transactionsRepo.createTransaction({
+			accountId,
+			subscriptionId: null,
+			planId: plan.id,
+			transactionReference: paystackResponse.data.reference,
+			status: TransactionStatus.PENDING,
+			amount: amountInKobo,
+			currency: plan.currency,
+			paymentMethod: "Paystack",
+			paystackCustomerCode: null,
+			metadata: {
+				type: "subscription",
+				paymentType: PlanPaymentType.SUBSCRIPTION,
+				planId: plan.id,
+				planName: plan.name,
+			},
+		});
+
 		return {
 			authorizationUrl: paystackResponse.data.authorization_url,
 			reference: paystackResponse.data.reference,
