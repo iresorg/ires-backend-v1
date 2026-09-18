@@ -5,6 +5,7 @@ import {
 	IsArray,
 	ValidateNested,
 	IsUUID,
+	IsNumber,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
@@ -12,19 +13,38 @@ import {
 	ITicketCreate,
 	ContactInformation,
 } from "../interfaces/ticket.interface";
-import { Transform, Type } from "class-transformer";
+import { plainToInstance, Transform } from "class-transformer";
 
-function parseJsonField({ value }: { value: unknown }) {
-	if (value === undefined || value === null || value === "") return undefined;
-	if (typeof value === "object") return value;
-	if (typeof value === "string") {
-		try {
-			return JSON.parse(value);
-		} catch {
+/**
+ * Multipart sends nested objects as JSON strings. Parse + instantiate so
+ * class-validator forbidUnknownValues accepts ValidateNested fields.
+ * Do not also use @Type() here — it can leave a plain object and fail validation.
+ */
+function toNestedDto(Cls: new () => object) {
+	return ({ value }: { value: unknown }) => {
+		if (value === undefined || value === null || value === "") {
+			return undefined;
+		}
+
+		if (typeof value === "object" && value !== null && value instanceof Cls) {
 			return value;
 		}
-	}
-	return value;
+
+		let parsed: unknown = value;
+		if (typeof value === "string") {
+			try {
+				parsed = JSON.parse(value);
+			} catch {
+				return value;
+			}
+		}
+
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+			return parsed;
+		}
+
+		return plainToInstance(Cls, parsed);
+	};
 }
 
 class VictimInformationDto implements VictimInformation {
@@ -35,6 +55,12 @@ class VictimInformationDto implements VictimInformation {
 
 	@ApiProperty({ description: "Victim's age" })
 	@IsOptional()
+	@Transform(({ value }) =>
+		value === "" || value === null || value === undefined
+			? undefined
+			: Number(value),
+	)
+	@IsNumber()
 	age: number;
 
 	@ApiProperty({ description: "Victim's gender" })
@@ -120,10 +146,9 @@ export class CreateTicketDto
 		required: false,
 	})
 	@IsOptional()
-	@Transform(parseJsonField)
+	@Transform(toNestedDto(ContactInformationDto))
 	@ValidateNested()
-	@Type(() => ContactInformationDto)
-	contactInformation?: Partial<ContactInformationDto>;
+	contactInformation?: ContactInformationDto;
 
 	@ApiProperty({ description: "Internal notes", required: false })
 	@IsOptional()
@@ -137,10 +162,9 @@ export class CreateTicketDto
 		type: VictimInformationDto,
 	})
 	@IsOptional()
-	@Transform(parseJsonField)
+	@Transform(toNestedDto(VictimInformationDto))
 	@ValidateNested()
-	@Type(() => VictimInformationDto)
-	victimInformation?: Partial<VictimInformationDto>;
+	victimInformation?: VictimInformationDto;
 
 	@ApiProperty({
 		description: "File attachments",
