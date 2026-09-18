@@ -30,8 +30,10 @@ Related: [`ADMIN_SUBSCRIPTION_PLANS.md`](./ADMIN_SUBSCRIPTION_PLANS.md), [`PUBLI
 If revenue is ₦0 but Paystack has money, **backfill once**:
 
 ```http
-POST /api/v1/admin/financials/sync-paystack?from=2026-01-01&to=2026-09-18
+GET /api/v1/admin/financials/sync-paystack?from=2026-03-18&to=2026-09-18
 ```
+
+No request body. Do **not** send `Content-Type: application/json` with `null`.
 
 Then refresh overview. Going forward, webhooks + pending rows on checkout keep the local ledger updated.
 
@@ -43,7 +45,7 @@ Then refresh overview. Going forward, webhooks + pending rows on checkout keep t
 |---|---|
 | Revenue cards, chart, recent local txs | `GET /admin/financials/overview` |
 | Payment ledger | `GET /admin/financials/transactions` |
-| Backfill local from Paystack | `POST /admin/financials/sync-paystack` |
+| Backfill local from Paystack | `GET /admin/financials/sync-paystack` |
 | Wallet balance | `GET /admin/financials/paystack/balance` |
 | Settlements | `GET /admin/financials/paystack/settlements` |
 
@@ -152,7 +154,7 @@ Keep these in a separate “Paystack wallet” section — not the revenue cards
 
 - [ ] Revenue cards from `summary` (local)
 - [ ] Optional reconcile badge when `paystackPeriod.gapVsLocal !== 0`
-- [ ] “Sync from Paystack” → `POST …/sync-paystack` → refresh overview
+- [ ] “Sync from Paystack” → `GET …/sync-paystack?from=&to=` → refresh overview
 - [ ] Transactions table from local ledger
 - [ ] Separate Paystack balance + settlements section
 - [ ] Amounts shown as ₦ (kobo / 100)

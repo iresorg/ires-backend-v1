@@ -416,12 +416,12 @@ export class AdminController {
 		return this.adminService.getPaystackSettlements(query);
 	}
 
-	@Post("financials/sync-paystack")
+	@Get("financials/sync-paystack")
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
 	@ApiOperation({
 		summary: "Backfill local payment ledger from Paystack",
 		description:
-			"Imports/updates subscription_transactions from Paystack charges in the date range. Run once (or periodically) so revenue uses local source of truth.",
+			"Imports/updates subscription_transactions from Paystack charges in the date range. Query-only (no body). Run once (or periodically) so revenue uses local source of truth.",
 	})
 	async syncPaystackTransactions(
 		@Query() query: FinancialsOverviewQueryDto,
