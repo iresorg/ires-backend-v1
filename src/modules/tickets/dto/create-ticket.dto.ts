@@ -13,12 +13,21 @@ import {
 	ITicketCreate,
 	ContactInformation,
 } from "../interfaces/ticket.interface";
-import { plainToInstance, Transform, Type } from "class-transformer";
+import { plainToInstance, Transform } from "class-transformer";
 
+/**
+ * Multipart sends nested objects as JSON strings. Parse + instantiate so
+ * class-validator forbidUnknownValues accepts ValidateNested fields.
+ * Do not also use @Type() here — it can leave a plain object and fail validation.
+ */
 function toNestedDto(Cls: new () => object) {
 	return ({ value }: { value: unknown }) => {
 		if (value === undefined || value === null || value === "") {
 			return undefined;
+		}
+
+		if (typeof value === "object" && value !== null && value instanceof Cls) {
+			return value;
 		}
 
 		let parsed: unknown = value;
@@ -34,7 +43,6 @@ function toNestedDto(Cls: new () => object) {
 			return parsed;
 		}
 
-		// class-validator forbidUnknownValues requires a real class instance
 		return plainToInstance(Cls, parsed);
 	};
 }
@@ -47,7 +55,11 @@ class VictimInformationDto implements VictimInformation {
 
 	@ApiProperty({ description: "Victim's age" })
 	@IsOptional()
-	@Type(() => Number)
+	@Transform(({ value }) =>
+		value === "" || value === null || value === undefined
+			? undefined
+			: Number(value),
+	)
 	@IsNumber()
 	age: number;
 
@@ -136,7 +148,6 @@ export class CreateTicketDto
 	@IsOptional()
 	@Transform(toNestedDto(ContactInformationDto))
 	@ValidateNested()
-	@Type(() => ContactInformationDto)
 	contactInformation?: ContactInformationDto;
 
 	@ApiProperty({ description: "Internal notes", required: false })
@@ -153,7 +164,6 @@ export class CreateTicketDto
 	@IsOptional()
 	@Transform(toNestedDto(VictimInformationDto))
 	@ValidateNested()
-	@Type(() => VictimInformationDto)
 	victimInformation?: VictimInformationDto;
 
 	@ApiProperty({
