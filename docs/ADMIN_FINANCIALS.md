@@ -62,9 +62,10 @@ Then refresh overview. Going forward, webhooks + pending rows on checkout keep t
 ## Sync Paystack → local
 
 ```http
-POST /api/v1/admin/financials/sync-paystack?from=2026-03-18&to=2026-09-18
+GET /api/v1/admin/financials/sync-paystack?from=2026-03-18&to=2026-09-18
 ```
 
+No body — query params only.
 ```json
 {
   "from": "…",
