@@ -1,6 +1,6 @@
 # IRES Backend - Cybersecurity Hotline Platform
 
-A modular monolith backend service for managing cybersecurity incident reports and hotline operations. production
+A modular monolith backend service for managing cybersecurity incident reports and hotline operations. production.
 
 ## Overview
 
