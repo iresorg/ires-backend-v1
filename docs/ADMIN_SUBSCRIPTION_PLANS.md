@@ -42,9 +42,12 @@ No admin token required.
 GET /api/v1/subscriptions/plans
 GET /api/v1/subscriptions/plans?accountType=individual
 GET /api/v1/subscriptions/plans?accountType=organization
+GET /api/v1/subscriptions/plans?paymentType=subscription
+GET /api/v1/subscriptions/plans?paymentType=one_time
 ```
 
-`accountType` is optional: `individual` | `organization`.
+`accountType` is optional: `individual` | `organization`.  
+`paymentType` is optional: `subscription` | `one_time`.
 
 ### Response
 
@@ -57,6 +60,7 @@ Array of plans (not wrapped):
     "name": "Basic Shield",
     "tier": 1,
     "accountType": "individual",
+    "paymentType": "subscription",
     "amount": 5000000,
     "currency": "NGN",
     "interval": "monthly",
@@ -74,10 +78,12 @@ Array of plans (not wrapped):
 
 ### UI
 
-- Two tabs or filters: Individual / Organization
-- Card per plan: name, description, formatted price, interval, feature list, CTA
+- Filters: Individual / Organization × Subscription / Pay as you go
+- Card per plan: name, description, formatted price, interval (subscriptions only), feature list, CTA
 - `maxIncidents` can be `null` → show “Unlimited”
 - Sort by `tier` (already ordered by backend)
+- Subscription CTA → `POST /subscriptions/initialize`
+- One-time CTA → `POST /subscriptions/initialize-payg`
 
 ---
 
@@ -108,6 +114,7 @@ GET /api/v1/admin/subscription-plans
       "name": "Basic Shield",
       "tier": 1,
       "accountType": "individual",
+      "paymentType": "subscription",
       "amount": 5000000,
       "currency": "NGN",
       "interval": "monthly",
@@ -123,7 +130,7 @@ GET /api/v1/admin/subscription-plans
 }
 ```
 
-Admin UI can show `paystackPlanCode` as read-only.
+Admin UI can show `paystackPlanCode` as read-only (subscriptions only; null for one_time).
 
 ### 2.2 Create a plan
 
@@ -131,13 +138,21 @@ Admin UI can show `paystackPlanCode` as read-only.
 POST /api/v1/admin/subscription-plans
 ```
 
-Do **not** send `paystackPlanCode`. Paystack creates the plan and the backend saves the code.
+Choose **`paymentType`** for every plan:
+
+| `paymentType` | What happens |
+|---|---|
+| `subscription` | Creates a Paystack plan (unless you pass `paystackPlanCode`). Recurring billing. |
+| `one_time` | No Paystack plan. Customer pays once via `initialize-payg` and gets an incident credit. |
+
+#### Subscription example
 
 ```json
 {
   "name": "Basic Shield",
   "tier": 1,
   "accountType": "individual",
+  "paymentType": "subscription",
   "amount": 5000000,
   "currency": "NGN",
   "interval": "monthly",
@@ -151,27 +166,60 @@ Do **not** send `paystackPlanCode`. Paystack creates the plan and the backend sa
 }
 ```
 
+#### Pay-as-you-go example
+
+```json
+{
+  "name": "Single Incident Response",
+  "tier": 0,
+  "accountType": "individual",
+  "paymentType": "one_time",
+  "amount": 2500000,
+  "description": "One incident, no monthly commitment",
+  "features": ["Single cyber incident resolution"],
+  "maxIncidents": 1,
+  "active": true
+}
+```
+
+Do **not** send `paystackPlanCode` for either (subscriptions auto-create it; one_time never uses it).
+
 | Field | Required | Notes |
 |---|---|---|
 | `name` | yes | string |
-| `tier` | yes | integer ≥ 1 |
+| `tier` | yes | integer ≥ 0 |
 | `accountType` | yes | `individual` or `organization` |
+| `paymentType` | yes | `subscription` or `one_time` |
 | `amount` | yes | kobo, number ≥ 0 |
 | `description` | yes | string |
 | `features` | yes | string array (can be empty `[]`) |
 | `currency` | no | default `NGN` |
-| `interval` | no | default `monthly` |
-| `maxIncidents` | no | number, or omit / `null` for unlimited |
+| `interval` | no | subscriptions only; default `monthly`. Ignored for `one_time` |
+| `maxIncidents` | no | number, or omit / `null` for unlimited. For `one_time` defaults to `1` |
 | `active` | no | default `true` |
-| `paystackPlanCode` | no | omit so Paystack creates it |
+| `paystackPlanCode` | no | omit; ignored for `one_time` |
 
 Response:
 
 ```json
 {
   "message": "Subscription plan created",
-  "plan": { "id": "uuid", "paystackPlanCode": "PLN_xxxxx", "...": "..." }
+  "plan": { "id": "uuid", "paymentType": "subscription", "paystackPlanCode": "PLN_xxxxx", "...": "..." }
 }
+```
+
+Admin UI form fields:
+
+1. Account type — Individual / Organization  
+2. Payment type — Subscription / One-time (pay as you go)  
+3. Name, amount, features, max incidents, active  
+4. Interval — show only when payment type is Subscription  
+
+Public pricing page:
+
+```
+GET /api/v1/subscriptions/plans?accountType=individual&paymentType=subscription
+GET /api/v1/subscriptions/plans?accountType=individual&paymentType=one_time
 ```
 
 ### 2.3 Update a plan
@@ -180,7 +228,7 @@ Response:
 PATCH /api/v1/admin/subscription-plans/{id}
 ```
 
-Send only fields that changed.
+Send only fields that changed. You can change `paymentType`, but converting subscription ↔ one_time should be rare — prefer create a new product.
 
 Change price:
 

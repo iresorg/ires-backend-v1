@@ -44,3 +44,23 @@ export class TicketCategoryNotFoundError extends HttpException {
 		this.name = "TicketCategoryNotFoundError";
 	}
 }
+
+export class TicketAccountNotEligibleError extends HttpException {
+	constructor(
+		message = "Account is not eligible to have a ticket created. Active subscription with remaining incidents or unused pay-as-you-go credit required.",
+	) {
+		super(message, HttpStatus.FORBIDDEN, {
+			description: message,
+		});
+		this.name = "TicketAccountNotEligibleError";
+	}
+}
+
+export class TicketAccountNotFoundError extends HttpException {
+	constructor(message = "Customer account not found") {
+		super(message, HttpStatus.NOT_FOUND, {
+			description: message,
+		});
+		this.name = "TicketAccountNotFoundError";
+	}
+}

@@ -1,9 +1,12 @@
+import { PlanPaymentType } from "@/modules/subscriptions/enums/plan-payment-type.enum";
+
 export const SUBSCRIPTION_PLANS = [
-	// Individual Plans
+	// Individual subscription plans
 	{
 		name: "Basic Shield",
 		tier: 1,
 		accountType: "individual" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 5000000, // ₦50,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -24,6 +27,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Safe Guard",
 		tier: 2,
 		accountType: "individual" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 8000000, // ₦80,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -45,6 +49,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Total Lockdown",
 		tier: 3,
 		accountType: "individual" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 10000000, // ₦100,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -62,11 +67,12 @@ export const SUBSCRIPTION_PLANS = [
 		maxIncidents: 3,
 		active: true,
 	},
-	// Organization Plans
+	// Organization subscription plans
 	{
 		name: "Business Shield",
 		tier: 1,
 		accountType: "organization" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 15000000, // ₦150,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -87,6 +93,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Enterprise Guard",
 		tier: 2,
 		accountType: "organization" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 25000000, // ₦250,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -108,6 +115,7 @@ export const SUBSCRIPTION_PLANS = [
 		name: "Corporate Fortress",
 		tier: 3,
 		accountType: "organization" as const,
+		paymentType: PlanPaymentType.SUBSCRIPTION,
 		amount: 50000000, // ₦500,000 in kobo
 		currency: "NGN",
 		interval: "monthly",
@@ -122,6 +130,46 @@ export const SUBSCRIPTION_PLANS = [
 			"SLA: under 4 hrs response time",
 		],
 		maxIncidents: null,
+		active: true,
+	},
+	// Example pay-as-you-go products (admin can create more via API)
+	{
+		name: "Pay As You Go",
+		tier: 0,
+		accountType: "individual" as const,
+		paymentType: PlanPaymentType.ONE_TIME,
+		amount: 2500000, // ₦25,000 in kobo
+		currency: "NGN",
+		interval: null,
+		paystackPlanCode: null,
+		description: "One-time incident response — pay only when you need help",
+		features: [
+			"Single cyber incident resolution",
+			"No monthly commitment",
+			"Incident reporting via phone/email",
+			"24–48 hrs response time",
+		],
+		maxIncidents: 1,
+		active: true,
+	},
+	{
+		name: "Pay As You Go Business",
+		tier: 0,
+		accountType: "organization" as const,
+		paymentType: PlanPaymentType.ONE_TIME,
+		amount: 7500000, // ₦75,000 in kobo
+		currency: "NGN",
+		interval: null,
+		paystackPlanCode: null,
+		description:
+			"One-time business incident response — pay per incident without a subscription",
+		features: [
+			"Single cyber incident resolution",
+			"No monthly commitment",
+			"Incident reporting hotline",
+			"24–48 hrs response time",
+		],
+		maxIncidents: 1,
 		active: true,
 	},
 ];

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PaystackService } from "./paystack.service";
 import { SubscriptionsRepository } from "../repository/subscriptions.repository";
 import { TransactionsRepository } from "../repository/transactions.repository";
+import { IncidentCreditsRepository } from "../repository/incident-credits.repository";
 import { TransactionStatus } from "../entities/transaction.entity";
 import { EmailService } from "@/shared/email/service";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
@@ -22,6 +23,7 @@ export class PaystackWebhookService {
 		private readonly paystack: PaystackService,
 		private readonly subscriptionsRepo: SubscriptionsRepository,
 		private readonly transactionsRepo: TransactionsRepository,
+		private readonly incidentCreditsRepo: IncidentCreditsRepository,
 		private readonly accountsRepo: AccountsRepository,
 		private readonly emailService: EmailService,
 		@InjectRepository(PaystackEvent)
@@ -99,6 +101,15 @@ export class PaystackWebhookService {
 	}
 
 	private async handleChargeSuccess(data: any) {
+		const metadata = data.metadata || {};
+		const isPayg =
+			metadata.type === "payg" || metadata.paymentType === "payg";
+
+		if (isPayg) {
+			await this.handlePaygChargeSuccess(data);
+			return;
+		}
+
 		// Successful payment - extend subscription
 		const subscriptionCode = data.subscription?.subscription_code;
 		const transactionReference = data.reference;
@@ -283,6 +294,101 @@ export class PaystackWebhookService {
 
 		this.logger.log(
 			`Subscription ${subscription.id} payment processed successfully`,
+		);
+	}
+
+	private async handlePaygChargeSuccess(data: any) {
+		const transactionReference = data.reference;
+		const metadata = data.metadata || {};
+		const accountId = metadata.accountId;
+		const planId = metadata.planId;
+		const incidentsGranted = Number(metadata.incidentsGranted ?? 1);
+
+		if (!transactionReference) {
+			this.logger.warn("PAYG charge.success missing transaction reference");
+			return;
+		}
+
+		let account =
+			(accountId && (await this.accountsRepo.findById(accountId))) ||
+			null;
+		if (!account && data.customer?.email) {
+			account = await this.accountsRepo.findByEmail(data.customer.email);
+		}
+		if (!account) {
+			this.logger.warn(
+				`PAYG charge.success could not resolve account. Reference: ${transactionReference}`,
+			);
+			return;
+		}
+
+		const plan = planId
+			? await this.subscriptionsRepo.findPlanById(planId)
+			: null;
+
+		let transaction =
+			await this.transactionsRepo.findByReference(transactionReference);
+
+		if (!transaction) {
+			transaction = await this.transactionsRepo.createTransaction({
+				accountId: account.id,
+				subscriptionId: null,
+				planId: plan?.id ?? planId ?? null,
+				transactionReference,
+				status: TransactionStatus.SUCCESS,
+				amount: data.amount || plan?.amount || 0,
+				currency: data.currency || plan?.currency || "NGN",
+				paymentMethod: data.authorization?.channel || "Paystack",
+				paystackCustomerCode: data.customer?.customer_code || null,
+				metadata: {
+					type: "payg",
+					paystackTransactionId: data.id,
+					incidentsGranted,
+				},
+			});
+		} else {
+			await this.transactionsRepo.updateTransaction(transaction.id, {
+				status: TransactionStatus.SUCCESS,
+				planId: plan?.id ?? transaction.planId,
+				metadata: {
+					...transaction.metadata,
+					type: "payg",
+					paystackTransactionId: data.id,
+					incidentsGranted,
+				},
+			});
+			transaction =
+				(await this.transactionsRepo.findByReference(
+					transactionReference,
+				)) || transaction;
+		}
+
+		const existingCredit =
+			await this.incidentCreditsRepo.findByTransactionId(transaction.id);
+		if (existingCredit) {
+			this.logger.log(
+				`PAYG credit already exists for transaction ${transactionReference}`,
+			);
+			return;
+		}
+
+		const creditsToGrant = Math.max(incidentsGranted || 1, 1);
+		for (let i = 0; i < creditsToGrant; i++) {
+			await this.incidentCreditsRepo.createCredit({
+				accountId: account.id,
+				planId: plan?.id ?? planId ?? null,
+				transactionId: transaction.id,
+				incidentsGranted: 1,
+				incidentsUsed: 0,
+				metadata: {
+					type: "payg",
+					transactionReference,
+				},
+			});
+		}
+
+		this.logger.log(
+			`Granted ${creditsToGrant} PAYG incident credit(s) to account ${account.id}`,
 		);
 	}
 

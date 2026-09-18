@@ -34,6 +34,7 @@ import { Role } from "../users/enums/role.enum";
 import { TicketStatus } from "../tickets/interfaces/ticket.interface";
 import { SubscriptionsRepository } from "../subscriptions/repository/subscriptions.repository";
 import { PaystackService } from "../subscriptions/services/paystack.service";
+import { PlanPaymentType } from "../subscriptions/enums/plan-payment-type.enum";
 
 @Injectable()
 export class AdminService {
@@ -300,8 +301,15 @@ export class AdminService {
 	}
 
 	async createSubscriptionPlan(dto: CreateSubscriptionPlanDto) {
-		let paystackPlanCode = dto.paystackPlanCode;
-		if (paystackPlanCode) {
+		const isPayg = dto.paymentType === PlanPaymentType.ONE_TIME;
+		const interval = isPayg ? null : (dto.interval ?? "monthly");
+
+		let paystackPlanCode = dto.paystackPlanCode ?? null;
+
+		if (isPayg) {
+			// One-time products must not create a Paystack subscription plan
+			paystackPlanCode = null;
+		} else if (paystackPlanCode) {
 			const existing =
 				await this.subscriptionsRepo.findPlanByPaystackCode(
 					paystackPlanCode,
@@ -314,7 +322,7 @@ export class AdminService {
 		} else {
 			const paystackPlan = await this.paystack.createPlan({
 				name: dto.name,
-				interval: dto.interval ?? "monthly",
+				interval: interval ?? "monthly",
 				amount: dto.amount,
 				currency: dto.currency ?? "NGN",
 				description: dto.description,
@@ -331,13 +339,14 @@ export class AdminService {
 			name: dto.name,
 			tier: dto.tier,
 			accountType: dto.accountType,
+			paymentType: dto.paymentType,
 			amount: dto.amount,
 			currency: dto.currency ?? "NGN",
-			interval: dto.interval ?? "monthly",
+			interval,
 			paystackPlanCode,
 			description: dto.description,
 			features: dto.features,
-			maxIncidents: dto.maxIncidents ?? null,
+			maxIncidents: dto.maxIncidents ?? (isPayg ? 1 : null),
 			active: dto.active ?? true,
 		});
 	}
@@ -348,10 +357,18 @@ export class AdminService {
 			throw new NotFoundException("Subscription plan not found");
 		}
 
+		const nextPaymentType = dto.paymentType ?? plan.paymentType;
+		const isPayg = nextPaymentType === PlanPaymentType.ONE_TIME;
+
 		if (
 			dto.paystackPlanCode &&
 			dto.paystackPlanCode !== plan.paystackPlanCode
 		) {
+			if (isPayg) {
+				throw new BadRequestException(
+					"Pay-as-you-go products cannot have a Paystack plan code",
+				);
+			}
 			const existing =
 				await this.subscriptionsRepo.findPlanByPaystackCode(
 					dto.paystackPlanCode,
@@ -365,22 +382,27 @@ export class AdminService {
 
 		const nextAmount = dto.amount ?? Number(plan.amount);
 		const nextName = dto.name ?? plan.name;
-		const nextInterval = dto.interval ?? plan.interval;
+		const nextInterval = isPayg
+			? null
+			: (dto.interval ?? plan.interval ?? "monthly");
 		const nextCurrency = dto.currency ?? plan.currency;
 		const nextDescription = dto.description ?? plan.description;
-		const paystackPlanCode =
-			dto.paystackPlanCode ?? plan.paystackPlanCode;
+		const paystackPlanCode = isPayg
+			? null
+			: (dto.paystackPlanCode ?? plan.paystackPlanCode);
 
 		const shouldSyncPaystack =
-			dto.amount !== undefined ||
-			dto.name !== undefined ||
-			dto.interval !== undefined ||
-			dto.description !== undefined;
+			!isPayg &&
+			!!paystackPlanCode &&
+			(dto.amount !== undefined ||
+				dto.name !== undefined ||
+				dto.interval !== undefined ||
+				dto.description !== undefined);
 
-		if (shouldSyncPaystack && paystackPlanCode) {
+		if (shouldSyncPaystack) {
 			await this.paystack.updatePlan(paystackPlanCode, {
 				name: nextName,
-				interval: nextInterval,
+				interval: nextInterval ?? "monthly",
 				amount: nextAmount,
 				currency: nextCurrency,
 				description: nextDescription,
@@ -394,12 +416,19 @@ export class AdminService {
 			...(dto.accountType !== undefined && {
 				accountType: dto.accountType,
 			}),
+			...(dto.paymentType !== undefined && {
+				paymentType: dto.paymentType,
+			}),
 			...(dto.amount !== undefined && { amount: dto.amount }),
 			...(dto.currency !== undefined && { currency: dto.currency }),
-			...(dto.interval !== undefined && { interval: dto.interval }),
-			...(dto.paystackPlanCode !== undefined && {
-				paystackPlanCode: dto.paystackPlanCode,
-			}),
+			...(dto.interval !== undefined || isPayg
+				? { interval: nextInterval }
+				: {}),
+			...(isPayg
+				? { paystackPlanCode: null }
+				: dto.paystackPlanCode !== undefined
+					? { paystackPlanCode: dto.paystackPlanCode }
+					: {}),
 			...(dto.description !== undefined && {
 				description: dto.description,
 			}),

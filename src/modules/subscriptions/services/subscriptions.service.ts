@@ -11,6 +11,8 @@ import { InitializeSubscriptionDto } from "../dto/initialize-subscription.dto";
 import { SubscriptionStatus } from "../entities/subscription.entity";
 import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import { EmailService } from "@/shared/email/service";
+import { TransactionStatus } from "../entities/transaction.entity";
+import { PlanPaymentType } from "../enums/plan-payment-type.enum";
 
 @Injectable()
 export class SubscriptionsService {
@@ -22,14 +24,21 @@ export class SubscriptionsService {
 		private readonly emailService: EmailService,
 	) {}
 
-	async getPlans(accountType?: "individual" | "organization") {
+	async getPlans(
+		accountType?: "individual" | "organization",
+		paymentType?: PlanPaymentType | string,
+	) {
 		const plans = await this.repo.findAllPlans(accountType);
+		const filtered = paymentType
+			? plans.filter((plan) => plan.paymentType === paymentType)
+			: plans;
 		// Hide internal integration fields (e.g., paystackPlanCode)
-		return plans.map((plan) => ({
+		return filtered.map((plan) => ({
 			id: plan.id,
 			name: plan.name,
 			tier: plan.tier,
 			accountType: plan.accountType,
+			paymentType: plan.paymentType,
 			amount: plan.amount,
 			currency: plan.currency,
 			interval: plan.interval,
@@ -61,6 +70,18 @@ export class SubscriptionsService {
 			throw new NotFoundException("Subscription plan not found");
 		}
 
+		if (plan.paymentType === PlanPaymentType.ONE_TIME) {
+			throw new BadRequestException(
+				"This is a pay-as-you-go product. Use POST /subscriptions/initialize-payg instead.",
+			);
+		}
+
+		if (!plan.paystackPlanCode) {
+			throw new BadRequestException(
+				"Subscription plan is missing a Paystack plan code",
+			);
+		}
+
 		// Get account details
 		const account = await this.accountsRepo.findById(accountId);
 		if (!account) {
@@ -80,6 +101,68 @@ export class SubscriptionsService {
 				accountId,
 				planId: plan.id,
 				planName: plan.name,
+				type: "subscription",
+				paymentType: PlanPaymentType.SUBSCRIPTION,
+			},
+		});
+
+		return {
+			authorizationUrl: paystackResponse.data.authorization_url,
+			reference: paystackResponse.data.reference,
+			accessCode: paystackResponse.data.access_code,
+		};
+	}
+
+	async initializePayg(accountId: string, dto: InitializeSubscriptionDto) {
+		const plan = await this.repo.findPlanById(dto.planId);
+		if (!plan) {
+			throw new NotFoundException("Pay-as-you-go product not found");
+		}
+
+		if (plan.paymentType !== PlanPaymentType.ONE_TIME) {
+			throw new BadRequestException(
+				"Plan is not a pay-as-you-go product. Use POST /subscriptions/initialize for subscriptions.",
+			);
+		}
+
+		if (!plan.active) {
+			throw new BadRequestException("This product is not available");
+		}
+
+		const account = await this.accountsRepo.findById(accountId);
+		if (!account) {
+			throw new NotFoundException("Account not found");
+		}
+
+		const paystackResponse = await this.paystack.initializeTransaction({
+			email: account.email,
+			amount: plan.amount,
+			callback_url: dto.callbackUrl,
+			metadata: {
+				type: "payg",
+				paymentType: PlanPaymentType.ONE_TIME,
+				accountId,
+				planId: plan.id,
+				planName: plan.name,
+				incidentsGranted: plan.maxIncidents ?? 1,
+			},
+		});
+
+		await this.transactionsRepo.createTransaction({
+			accountId,
+			subscriptionId: null,
+			planId: plan.id,
+			transactionReference: paystackResponse.data.reference,
+			status: TransactionStatus.PENDING,
+			amount: plan.amount,
+			currency: plan.currency,
+			paymentMethod: "Paystack",
+			paystackCustomerCode: null,
+			metadata: {
+				type: "payg",
+				paymentType: PlanPaymentType.ONE_TIME,
+				planId: plan.id,
+				incidentsGranted: plan.maxIncidents ?? 1,
 			},
 		});
 

@@ -39,14 +39,25 @@ export class SubscriptionsController {
 		enum: ["individual", "organization"],
 		description: "Filter plans by account type",
 	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
+		description:
+			"subscription = recurring plans; one_time = pay-as-you-go products",
+	})
 	@ApiResponse({
 		status: 200,
 		description: "Plans retrieved successfully",
 	})
 	async getPlans(
 		@Query("accountType") accountType?: "individual" | "organization",
+		@Query("paymentType") paymentType?: string,
 	) {
-		return await this.subscriptionsService.getPlans(accountType);
+		return await this.subscriptionsService.getPlans(
+			accountType,
+			paymentType,
+		);
 	}
 
 	@UseGuards(AccountsAuthGuard)
@@ -88,6 +99,23 @@ export class SubscriptionsController {
 			req.user.id,
 			dto,
 		);
+	}
+
+	@UseGuards(AccountsAuthGuard)
+	@Post("initialize-payg")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: "Initialize pay-as-you-go (one-time) payment",
+		description:
+			"One-time Paystack charge for a single incident credit. Does not create a recurring subscription.",
+	})
+	@ApiBody({ type: InitializeSubscriptionDto })
+	@ApiResponse({
+		status: 200,
+		description: "PAYG payment initialized successfully",
+	})
+	async initializePayg(@Body() dto: InitializeSubscriptionDto, @Req() req: any) {
+		return await this.subscriptionsService.initializePayg(req.user.id, dto);
 	}
 
 	@UseGuards(AccountsAuthGuard)

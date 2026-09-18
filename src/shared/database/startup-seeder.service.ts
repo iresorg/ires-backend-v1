@@ -24,6 +24,7 @@ export class StartupSeederService implements OnModuleInit {
 			this.logger.log("Running startup seeder...");
 			await this.seedSuperAdmin();
 			await this.seedSubscriptionPlans();
+			await this.ensurePaygPlans();
 			this.logger.log("Startup seeder completed successfully");
 		} catch (error) {
 			this.logger.error(
@@ -75,6 +76,29 @@ export class StartupSeederService implements OnModuleInit {
 			const plan = planRepository.create(planData);
 			await planRepository.save(plan);
 			this.logger.log(`Created subscription plan: ${planData.name}`);
+		}
+	}
+
+	/** Ensures PAYG products exist even when monthly plans were seeded earlier. */
+	private async ensurePaygPlans() {
+		const planRepository = this.dataSource.getRepository(SubscriptionPlan);
+		const paygPlans = SUBSCRIPTION_PLANS.filter(
+			(plan) => plan.paymentType === "one_time",
+		);
+
+		for (const planData of paygPlans) {
+			const existing = await planRepository.findOne({
+				where: {
+					name: planData.name,
+					accountType: planData.accountType,
+					paymentType: planData.paymentType,
+				},
+			});
+			if (existing) continue;
+
+			const plan = planRepository.create(planData);
+			await planRepository.save(plan);
+			this.logger.log(`Created PAYG product: ${planData.name}`);
 		}
 	}
 }

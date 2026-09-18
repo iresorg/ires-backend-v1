@@ -29,18 +29,41 @@ export class TicketsRepository {
 	): Promise<ITicket> {
 		const repo = this.getRepo(trx);
 
-		return repo.save({
-			...body,
+		const saved = await repo.save({
+			ticketId: body.ticketId,
+			title: body.title,
+			description: body.description,
+			location: body.location,
+			reporterName: body.reporterName,
+			contactInformation: body.contactInformation,
+			victimInformation: body.victimInformation,
+			internalNotes: body.internalNotes,
+			attachments: body.attachments,
+			entitlementSource: body.entitlementSource ?? null,
+			createdForAccountId: body.createdForAccountId,
+			incidentCreditId: body.incidentCreditId ?? null,
 			createdBy: {
 				id: body.createdById,
+			},
+			createdFor: {
+				id: body.createdForAccountId,
 			},
 			category: {
 				id: body.categoryId,
 			},
-			subCategory: {
-				id: body.subCategoryId,
-			},
-		});
+			...(body.subCategoryId && {
+				subCategory: {
+					id: body.subCategoryId,
+				},
+			}),
+			...(body.incidentCreditId && {
+				incidentCredit: {
+					id: body.incidentCreditId,
+				},
+			}),
+		} as Partial<Tickets>);
+
+		return this.mapEntityToITicket(saved as Tickets);
 	}
 
 	async getTicketById(
@@ -52,8 +75,10 @@ export class TicketsRepository {
 			where: { ticketId },
 			relations: {
 				createdBy: true,
+				createdFor: true,
 				category: true,
 				subCategory: true,
+				assignedResponder: true,
 			},
 		});
 
@@ -81,11 +106,14 @@ export class TicketsRepository {
 		const query = repo.createQueryBuilder("ticket")
 			.leftJoinAndSelect("ticket.category", "category")
 			.leftJoinAndSelect("ticket.subCategory", "subCategory")
+			.leftJoinAndSelect("ticket.createdFor", "createdFor")
 			.select([
 				"ticket.ticketId",
 				"ticket.tier",
 				"category",
 				"subCategory",
+				"createdFor",
+				"ticket.entitlementSource",
 				"ticket.createdAt",
 				"ticket.updatedAt",
 				"ticket.status",
@@ -100,11 +128,25 @@ export class TicketsRepository {
 			}
 
 		const [tickets, total] = await query.getManyAndCount();
-		console.log(tickets)
 		return {
 			data: tickets.map((ticket) => this.mapEntityToITicketSummary(ticket)),
 			pagination: getPaginationMeta(total, page, limit)
 		};
+	}
+
+	async countTicketsForAccountInPeriod(
+		accountId: string,
+		periodStart: Date,
+		periodEnd: Date,
+		trx?: TDatabaseTransaction,
+	): Promise<number> {
+		const repo = this.getRepo(trx);
+		return repo
+			.createQueryBuilder("ticket")
+			.where("ticket.created_for_account_id = :accountId", { accountId })
+			.andWhere("ticket.created_at >= :periodStart", { periodStart })
+			.andWhere("ticket.created_at < :periodEnd", { periodEnd })
+			.getCount();
 	}
 
 	async updateTicket(
@@ -134,6 +176,15 @@ export class TicketsRepository {
 			severity: ticket.severity,
 			createdAt: ticket.createdAt,
 			updatedAt: ticket.updatedAt,
+			entitlementSource: ticket.entitlementSource,
+			createdFor: ticket.createdFor
+				? {
+						id: ticket.createdFor.id,
+						email: ticket.createdFor.email,
+						role: ticket.createdFor.role,
+						status: ticket.createdFor.status,
+					}
+				: undefined,
 			category: {
 				id: ticket.category?.id,
 				name: ticket.category?.name,
@@ -166,12 +217,21 @@ export class TicketsRepository {
 			internalNotes: ticket.internalNotes,
 			createdAt: ticket.createdAt,
 			updatedAt: ticket.updatedAt,
+			entitlementSource: ticket.entitlementSource,
 			createdBy: {
 				id: ticket.createdBy?.id,
 				firstName: ticket.createdBy?.firstName,
 				lastName: ticket.createdBy?.lastName,
 				role: ticket.createdBy?.role,
 			},
+			createdFor: ticket.createdFor
+				? {
+						id: ticket.createdFor.id,
+						email: ticket.createdFor.email,
+						role: ticket.createdFor.role,
+						status: ticket.createdFor.status,
+					}
+				: undefined,
 			assignedResponder: {
 				id: ticket.assignedResponder?.id,
 				firstName: ticket.assignedResponder?.firstName,

@@ -8,9 +8,11 @@ import {
 	IsOptional,
 	IsString,
 	Min,
+	ValidateIf,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import { PlanPaymentType } from "@/modules/subscriptions/enums/plan-payment-type.enum";
 
 export class CreateSubscriptionPlanDto {
 	@ApiProperty({ example: "Basic Shield" })
@@ -18,15 +20,27 @@ export class CreateSubscriptionPlanDto {
 	@IsNotEmpty()
 	name: string;
 
-	@ApiProperty({ example: 1 })
+	@ApiProperty({
+		example: 1,
+		description: "Display / ranking tier. Can be 0 for PAYG products.",
+	})
 	@Type(() => Number)
 	@IsInt()
-	@Min(1)
+	@Min(0)
 	tier: number;
 
 	@ApiProperty({ enum: ["individual", "organization"] })
 	@IsIn(["individual", "organization"])
 	accountType: "individual" | "organization";
+
+	@ApiProperty({
+		enum: PlanPaymentType,
+		example: PlanPaymentType.SUBSCRIPTION,
+		description:
+			"subscription = recurring plan (Paystack subscription). one_time = pay-as-you-go (single charge, no recurring).",
+	})
+	@IsIn(Object.values(PlanPaymentType))
+	paymentType: PlanPaymentType;
 
 	@ApiProperty({
 		example: 5000000,
@@ -42,14 +56,19 @@ export class CreateSubscriptionPlanDto {
 	@IsString()
 	currency?: string;
 
-	@ApiPropertyOptional({ example: "monthly" })
+	@ApiPropertyOptional({
+		example: "monthly",
+		description:
+			"Billing interval for subscription plans only (e.g. monthly). Ignored for one_time.",
+	})
+	@ValidateIf((o) => o.paymentType === PlanPaymentType.SUBSCRIPTION)
 	@IsOptional()
 	@IsString()
 	interval?: string;
 
 	@ApiPropertyOptional({
 		description:
-			"Existing Paystack plan code. If omitted, a Paystack plan is created automatically.",
+			"Existing Paystack plan code for subscriptions. If omitted on subscription create, Paystack creates one. Always ignored for one_time.",
 	})
 	@IsOptional()
 	@IsString()
@@ -65,7 +84,11 @@ export class CreateSubscriptionPlanDto {
 	@IsString({ each: true })
 	features: string[];
 
-	@ApiPropertyOptional({ example: 1, nullable: true })
+	@ApiPropertyOptional({
+		example: 1,
+		nullable: true,
+		description: "For one_time defaults to 1 if omitted",
+	})
 	@IsOptional()
 	@Type(() => Number)
 	@IsInt()

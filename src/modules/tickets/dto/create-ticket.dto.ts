@@ -63,7 +63,15 @@ class ContactInformationDto implements ContactInformation {
 }
 
 export class CreateTicketDto
-	implements Omit<ITicketCreate, "ticketId" | "createdById">
+	implements
+		Omit<
+			ITicketCreate,
+			| "ticketId"
+			| "createdById"
+			| "createdForAccountId"
+			| "entitlementSource"
+			| "incidentCreditId"
+		>
 {
 	@ApiProperty({ description: "Ticket title" })
 	@IsNotEmpty()
@@ -131,4 +139,11 @@ export class CreateTicketDto
 	@IsOptional()
 	@IsString()
 	subCategoryId?: string;
+
+	@ApiProperty({
+		description:
+			"Customer account this ticket is created for (must have active subscription or unused PAYG credit)",
+	})
+	@IsUUID()
+	accountId: string;
 }
