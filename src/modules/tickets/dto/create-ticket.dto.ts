@@ -5,7 +5,6 @@ import {
 	IsArray,
 	ValidateNested,
 	IsUUID,
-	IsNumber,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
@@ -13,30 +12,19 @@ import {
 	ITicketCreate,
 	ContactInformation,
 } from "../interfaces/ticket.interface";
-import { plainToInstance, Transform, Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 
-function toNestedDto(Cls: new () => object) {
-	return ({ value }: { value: unknown }) => {
-		if (value === undefined || value === null || value === "") {
-			return undefined;
+function parseJsonField({ value }: { value: unknown }) {
+	if (value === undefined || value === null || value === "") return undefined;
+	if (typeof value === "object") return value;
+	if (typeof value === "string") {
+		try {
+			return JSON.parse(value);
+		} catch {
+			return value;
 		}
-
-		let parsed: unknown = value;
-		if (typeof value === "string") {
-			try {
-				parsed = JSON.parse(value);
-			} catch {
-				return value;
-			}
-		}
-
-		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-			return parsed;
-		}
-
-		// class-validator forbidUnknownValues requires a real class instance
-		return plainToInstance(Cls, parsed);
-	};
+	}
+	return value;
 }
 
 class VictimInformationDto implements VictimInformation {
@@ -47,8 +35,6 @@ class VictimInformationDto implements VictimInformation {
 
 	@ApiProperty({ description: "Victim's age" })
 	@IsOptional()
-	@Type(() => Number)
-	@IsNumber()
 	age: number;
 
 	@ApiProperty({ description: "Victim's gender" })
@@ -134,10 +120,10 @@ export class CreateTicketDto
 		required: false,
 	})
 	@IsOptional()
-	@Transform(toNestedDto(ContactInformationDto))
+	@Transform(parseJsonField)
 	@ValidateNested()
 	@Type(() => ContactInformationDto)
-	contactInformation?: ContactInformationDto;
+	contactInformation?: Partial<ContactInformationDto>;
 
 	@ApiProperty({ description: "Internal notes", required: false })
 	@IsOptional()
@@ -151,10 +137,10 @@ export class CreateTicketDto
 		type: VictimInformationDto,
 	})
 	@IsOptional()
-	@Transform(toNestedDto(VictimInformationDto))
+	@Transform(parseJsonField)
 	@ValidateNested()
 	@Type(() => VictimInformationDto)
-	victimInformation?: VictimInformationDto;
+	victimInformation?: Partial<VictimInformationDto>;
 
 	@ApiProperty({
 		description: "File attachments",
