@@ -350,7 +350,53 @@ Required fields:
 | `reporterName` | string |
 | `categoryId` | UUID |
 
-Optional: `subCategoryId`, `internalNotes`, `contactInformation`, `victimInformation`, `attachments[]`
+Optional: `subCategoryId`, `internalNotes`, `attachments[]`, **`contactInformation`**, **`victimInformation`**
+
+### Contact & victim (not single text inputs)
+
+These are **optional nested objects**, not one free-text field each. Send as JSON string fields in multipart (or nested form keys — see note below).
+
+**`contactInformation`** — who to reach about the incident:
+
+| Field | Required if object sent | Type |
+|---|---|---|
+| `email` | yes | string |
+| `phone` | yes | string |
+| `address` | yes | string |
+
+**`victimInformation`** — person affected (when different / needed):
+
+| Field | Required if object sent | Type |
+|---|---|---|
+| `name` | yes | string |
+| `phone` | yes | string |
+| `address` | yes | string |
+| `email` | yes | string |
+| `age` | no | number |
+| `gender` | no | string |
+
+Example (multipart): separate UI inputs → build objects before submit:
+
+```ts
+form.append("contactInformation", JSON.stringify({
+  email: "contact@example.com",
+  phone: "+234…",
+  address: "Lagos",
+}));
+
+form.append("victimInformation", JSON.stringify({
+  name: "Jane Doe",
+  phone: "+234…",
+  address: "Abuja",
+  email: "jane@example.com",
+  age: 28,
+  gender: "female",
+}));
+```
+
+UI: one **section** each (Contact / Victim), with the fields above — not a single textarea labeled “contact information”.
+
+Omit both entirely when not collected.
 
 ### UI acceptance
 
@@ -360,6 +406,8 @@ Optional: `subCategoryId`, `internalNotes`, `contactInformation`, `victimInforma
 - [ ] Optional: confirm with `GET /tickets/eligibility/:accountId` before submit
 - [ ] Disable submit when nothing selected / ineligible
 - [ ] Category required; sub-category when parent has children
+- [ ] Contact section: email / phone / address (optional section)
+- [ ] Victim section: name / phone / address / email (+ optional age, gender)
 - [ ] On success show `ticketId`, `createdBy`, `createdFor`, `entitlementSource`
 - [ ] On success, note that the customer is emailed and can see the ticket in their portal
 
@@ -484,6 +532,8 @@ Content-Type: multipart/form-data
 - `title` / `type` / `description` / `location` / `reporterName`
 - `categoryId` = `<uuid>`
 - `subCategoryId` = optional
+- `contactInformation` = optional object `{ email, phone, address }` (not one text field)
+- `victimInformation` = optional object `{ name, phone, address, email, age?, gender? }`
 - `attachments` = files
 
 `createdBy` = staff from token. Eligibility + credit consumption happen server-side.  
