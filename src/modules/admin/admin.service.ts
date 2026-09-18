@@ -39,6 +39,15 @@ import { TicketStatus } from "../tickets/interfaces/ticket.interface";
 import { SubscriptionsRepository } from "../subscriptions/repository/subscriptions.repository";
 import { PaystackService } from "../subscriptions/services/paystack.service";
 import { PlanPaymentType } from "../subscriptions/enums/plan-payment-type.enum";
+import {
+	SubscriptionTransaction,
+	TransactionStatus,
+} from "../subscriptions/entities/transaction.entity";
+import {
+	FinancialsOverviewQueryDto,
+	FinancialsTransactionsQueryDto,
+	PaystackSettlementsQueryDto,
+} from "./dto/financials-query.dto";
 
 @Injectable()
 export class AdminService {
@@ -56,6 +65,8 @@ export class AdminService {
 		private readonly tickets: Repository<Tickets>,
 		@InjectRepository(TicketLifecycle)
 		private readonly ticketLifecycle: Repository<TicketLifecycle>,
+		@InjectRepository(SubscriptionTransaction)
+		private readonly transactions: Repository<SubscriptionTransaction>,
 		private readonly subscriptionsRepo: SubscriptionsRepository,
 		private readonly paystack: PaystackService,
 	) {}
@@ -526,5 +537,341 @@ export class AdminService {
 
 		await this.subscriptionsRepo.deletePlan(id);
 		return { message: "Subscription plan deleted", id };
+	}
+
+	async getFinancialsOverview(query: FinancialsOverviewQueryDto) {
+		const { from, to } = this.resolveDateRange(query.from, query.to);
+		const months = Math.min(Math.max(query.months ?? 6, 1), 24);
+
+		const qb = this.transactions
+			.createQueryBuilder("tx")
+			.leftJoinAndSelect("tx.plan", "plan")
+			.where("tx.created_at >= :from", { from })
+			.andWhere("tx.created_at <= :to", { to });
+
+		const txs = await qb.getMany();
+
+		let revenueTotal = 0;
+		let revenueSubscription = 0;
+		let revenuePayg = 0;
+		let successCount = 0;
+		let failedCount = 0;
+		let pendingCount = 0;
+
+		const byMonth = new Map<
+			string,
+			{ subscription: number; payg: number; total: number }
+		>();
+
+		for (const tx of txs) {
+			const amount = this.toNumber(tx.amount);
+			const paymentType = this.resolveTxPaymentType(tx);
+
+			if (tx.status === TransactionStatus.SUCCESS) {
+				successCount += 1;
+				revenueTotal += amount;
+				if (paymentType === PlanPaymentType.ONE_TIME) {
+					revenuePayg += amount;
+				} else {
+					revenueSubscription += amount;
+				}
+
+				const key = this.monthKey(tx.createdAt);
+				const bucket = byMonth.get(key) ?? {
+					subscription: 0,
+					payg: 0,
+					total: 0,
+				};
+				if (paymentType === PlanPaymentType.ONE_TIME) {
+					bucket.payg += amount;
+				} else {
+					bucket.subscription += amount;
+				}
+				bucket.total += amount;
+				byMonth.set(key, bucket);
+			} else if (tx.status === TransactionStatus.FAILED) {
+				failedCount += 1;
+			} else {
+				pendingCount += 1;
+			}
+		}
+
+		const revenueByMonth = this.buildMonthSeries(months).map((month) => {
+			const bucket = byMonth.get(month) ?? {
+				subscription: 0,
+				payg: 0,
+				total: 0,
+			};
+			return { month, ...bucket };
+		});
+
+		const [mrrData, paygCreditsAvailable] = await Promise.all([
+			this.computeMrr(),
+			this.incidentCredits.count({
+				where: { status: IncidentCreditStatus.AVAILABLE },
+			}),
+		]);
+
+		const recent = await this.transactions.find({
+			relations: {
+				account: {
+					individualProfile: true,
+					organizationProfile: true,
+				},
+				plan: true,
+			},
+			order: { createdAt: "DESC" },
+			take: 10,
+		});
+
+		return {
+			currency: "NGN",
+			range: { from, to },
+			summary: {
+				revenueTotal,
+				revenueSubscription,
+				revenuePayg,
+				successCount,
+				failedCount,
+				pendingCount,
+				mrr: mrrData.mrr,
+				activeSubscribers: mrrData.activeSubscribers,
+				paygCreditsAvailable,
+			},
+			revenueByMonth,
+			recentTransactions: recent.map((tx) => this.mapTransaction(tx)),
+		};
+	}
+
+	async getFinancialsTransactions(query: FinancialsTransactionsQueryDto) {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+		const offset = (page - 1) * limit;
+
+		const qb = this.transactions
+			.createQueryBuilder("tx")
+			.leftJoinAndSelect("tx.account", "account")
+			.leftJoinAndSelect("account.individualProfile", "individualProfile")
+			.leftJoinAndSelect(
+				"account.organizationProfile",
+				"organizationProfile",
+			)
+			.leftJoinAndSelect("tx.plan", "plan")
+			.orderBy("tx.createdAt", "DESC");
+
+		if (query.status) {
+			qb.andWhere("tx.status = :status", { status: query.status });
+		}
+
+		if (query.from) {
+			qb.andWhere("tx.created_at >= :from", {
+				from: new Date(query.from),
+			});
+		}
+
+		if (query.to) {
+			const to = new Date(query.to);
+			to.setHours(23, 59, 59, 999);
+			qb.andWhere("tx.created_at <= :to", { to });
+		}
+
+		if (query.search?.trim()) {
+			const search = `%${query.search.toLowerCase().trim()}%`;
+			qb.andWhere(
+				"(LOWER(account.email) LIKE :search OR LOWER(tx.transaction_reference) LIKE :search OR LOWER(individualProfile.first_name) LIKE :search OR LOWER(individualProfile.last_name) LIKE :search OR LOWER(organizationProfile.organization_name) LIKE :search)",
+				{ search },
+			);
+		}
+
+		if (query.paymentType === PlanPaymentType.ONE_TIME) {
+			qb.andWhere(
+				`(
+					tx.metadata->>'type' = 'payg'
+					OR tx.metadata->>'paymentType' IN ('payg', 'one_time')
+					OR plan.payment_type = :oneTime
+					OR (tx.subscription_id IS NULL AND (plan.id IS NULL OR plan.payment_type = :oneTime))
+				)`,
+				{ oneTime: PlanPaymentType.ONE_TIME },
+			);
+		} else if (query.paymentType === PlanPaymentType.SUBSCRIPTION) {
+			qb.andWhere(
+				`(
+					COALESCE(tx.metadata->>'type', '') <> 'payg'
+					AND COALESCE(tx.metadata->>'paymentType', '') NOT IN ('payg', 'one_time')
+					AND (
+						plan.payment_type = :subscription
+						OR (tx.subscription_id IS NOT NULL AND (plan.id IS NULL OR plan.payment_type IS DISTINCT FROM :oneTime))
+					)
+				)`,
+				{
+					subscription: PlanPaymentType.SUBSCRIPTION,
+					oneTime: PlanPaymentType.ONE_TIME,
+				},
+			);
+		}
+
+		const [rows, total] = await qb.skip(offset).take(limit).getManyAndCount();
+
+		return {
+			transactions: rows.map((tx) => this.mapTransaction(tx)),
+			total,
+		};
+	}
+
+	async getPaystackBalance() {
+		const response = await this.paystack.getBalance();
+		const balances = Array.isArray(response?.data) ? response.data : [];
+		return {
+			source: "paystack",
+			balances: balances.map((row: any) => ({
+				currency: row.currency,
+				balance: row.balance,
+				balanceNaira: this.toNumber(row.balance) / 100,
+			})),
+		};
+	}
+
+	async getPaystackSettlements(query: PaystackSettlementsQueryDto) {
+		const response = await this.paystack.listSettlements({
+			page: query.page ?? 1,
+			perPage: query.perPage ?? 20,
+			from: query.from,
+			to: query.to,
+		});
+
+		const settlements = Array.isArray(response?.data) ? response.data : [];
+		return {
+			source: "paystack",
+			settlements: settlements.map((row: any) => ({
+				id: row.id,
+				status: row.status,
+				currency: row.currency,
+				totalAmount: row.total_amount,
+				totalAmountNaira: this.toNumber(row.total_amount) / 100,
+				effectiveAmount: row.effective_amount,
+				settlementDate: row.settlement_date,
+				deductedAmount: row.deducted_amount,
+				settlementFee: row.settlement_fees ?? row.fee,
+			})),
+			meta: response?.meta ?? null,
+		};
+	}
+
+	private async computeMrr(): Promise<{
+		mrr: number;
+		activeSubscribers: number;
+	}> {
+		const active = await this.subscriptions.find({
+			where: { status: SubscriptionStatus.ACTIVE },
+			relations: ["plan"],
+		});
+
+		const recurring = active.filter(
+			(sub) =>
+				sub.plan?.paymentType !== PlanPaymentType.ONE_TIME &&
+				sub.plan?.interval != null,
+		);
+
+		const mrr = recurring.reduce(
+			(sum, sub) => sum + this.toNumber(sub.plan?.amount ?? 0),
+			0,
+		);
+
+		return { mrr, activeSubscribers: recurring.length };
+	}
+
+	private resolveTxPaymentType(
+		tx: SubscriptionTransaction,
+	): PlanPaymentType {
+		const metaType = tx.metadata?.type ?? tx.metadata?.paymentType;
+		if (
+			metaType === "payg" ||
+			metaType === PlanPaymentType.ONE_TIME ||
+			metaType === "one_time"
+		) {
+			return PlanPaymentType.ONE_TIME;
+		}
+		if (tx.plan?.paymentType === PlanPaymentType.ONE_TIME) {
+			return PlanPaymentType.ONE_TIME;
+		}
+		if (tx.plan?.paymentType === PlanPaymentType.SUBSCRIPTION) {
+			return PlanPaymentType.SUBSCRIPTION;
+		}
+		if (!tx.subscriptionId) {
+			return PlanPaymentType.ONE_TIME;
+		}
+		return PlanPaymentType.SUBSCRIPTION;
+	}
+
+	private mapTransaction(tx: SubscriptionTransaction) {
+		const paymentType = this.resolveTxPaymentType(tx);
+		const amount = this.toNumber(tx.amount);
+		return {
+			id: tx.id,
+			reference: tx.transactionReference,
+			status: tx.status,
+			amount,
+			amountNaira: amount / 100,
+			currency: tx.currency,
+			paymentType,
+			paymentMethod: tx.paymentMethod,
+			accountId: tx.accountId,
+			accountEmail: tx.account?.email ?? null,
+			accountName: tx.account
+				? this.accountDisplayName(tx.account)
+				: null,
+			planId: tx.planId,
+			planName: tx.plan?.name ?? null,
+			subscriptionId: tx.subscriptionId,
+			createdAt: tx.createdAt,
+		};
+	}
+
+	private accountDisplayName(account: Account): string {
+		if (account.individualProfile?.firstName) {
+			const last = account.individualProfile.lastName?.trim();
+			return last
+				? `${account.individualProfile.firstName} ${last}`
+				: account.individualProfile.firstName;
+		}
+		if (account.organizationProfile?.organizationName) {
+			return account.organizationProfile.organizationName;
+		}
+		return account.email;
+	}
+
+	private resolveDateRange(from?: string, to?: string): {
+		from: Date;
+		to: Date;
+	} {
+		const end = to ? new Date(to) : new Date();
+		end.setHours(23, 59, 59, 999);
+		const start = from
+			? new Date(from)
+			: new Date(end.getFullYear(), end.getMonth() - 5, 1);
+		start.setHours(0, 0, 0, 0);
+		return { from: start, to: end };
+	}
+
+	private monthKey(date: Date): string {
+		const d = new Date(date);
+		const month = `${d.getMonth() + 1}`.padStart(2, "0");
+		return `${d.getFullYear()}-${month}`;
+	}
+
+	private buildMonthSeries(months: number): string[] {
+		const keys: string[] = [];
+		const now = new Date();
+		for (let i = months - 1; i >= 0; i -= 1) {
+			const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+			keys.push(this.monthKey(d));
+		}
+		return keys;
+	}
+
+	private toNumber(value: number | string | null | undefined): number {
+		if (value === null || value === undefined) return 0;
+		const n = typeof value === "string" ? Number(value) : value;
+		return Number.isFinite(n) ? n : 0;
 	}
 }

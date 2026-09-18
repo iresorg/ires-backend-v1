@@ -181,4 +181,41 @@ export class PaystackService {
 			.digest("hex");
 		return hash === signature;
 	}
+
+	async getBalance() {
+		try {
+			const response = await axios.get(`${this.baseURL}/balance`, {
+				headers: this.getHeaders(),
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack balance error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
+
+	async listSettlements(params?: {
+		perPage?: number;
+		page?: number;
+		from?: string;
+		to?: string;
+	}) {
+		try {
+			const response = await axios.get(`${this.baseURL}/settlement`, {
+				headers: this.getHeaders(),
+				params: {
+					perPage: params?.perPage ?? 20,
+					page: params?.page ?? 1,
+					from: params?.from,
+					to: params?.to,
+				},
+			});
+			return response.data;
+		} catch (error: any) {
+			throw new Error(
+				`Paystack settlements error: ${error.response?.data?.message || error.message}`,
+			);
+		}
+	}
 }

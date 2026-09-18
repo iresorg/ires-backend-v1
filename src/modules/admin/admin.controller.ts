@@ -16,6 +16,11 @@ import {
 	CreateSubscriptionPlanDto,
 	UpdateSubscriptionPlanDto,
 } from "./dto/subscription-plan.dto";
+import {
+	FinancialsOverviewQueryDto,
+	FinancialsTransactionsQueryDto,
+	PaystackSettlementsQueryDto,
+} from "./dto/financials-query.dto";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
@@ -347,5 +352,67 @@ export class AdminController {
 	})
 	async deleteSubscriptionPlan(@Param("id") id: string) {
 		return this.adminService.deleteSubscriptionPlan(id);
+	}
+
+	@Get("financials/overview")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Admin financials overview (from local payments)",
+		description:
+			"Revenue, success/fail counts, PAYG vs subscription split, approximate MRR, and monthly chart. Amounts in kobo.",
+	})
+	async getFinancialsOverview(@Query() query: FinancialsOverviewQueryDto) {
+		return this.adminService.getFinancialsOverview(query);
+	}
+
+	@Get("financials/transactions")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Admin payment ledger",
+		description:
+			"Paginated local Paystack-backed transactions with status and paymentType filters.",
+	})
+	async getFinancialsTransactions(
+		@Query() query: FinancialsTransactionsQueryDto,
+	): Promise<
+		| PaginationResult<Record<string, unknown>>
+		| { transactions: Record<string, unknown>[]; total: number }
+	> {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+		const result = await this.adminService.getFinancialsTransactions({
+			...query,
+			page,
+			limit,
+		});
+
+		if (query.page && query.limit) {
+			return buildPaginationResult(result.transactions, result.total, {
+				page,
+				limit,
+			});
+		}
+
+		return result;
+	}
+
+	@Get("financials/paystack/balance")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Paystack wallet balance (live)",
+		description: "Proxies Paystack GET /balance so ops need not open the Paystack dashboard.",
+	})
+	async getPaystackBalance() {
+		return this.adminService.getPaystackBalance();
+	}
+
+	@Get("financials/paystack/settlements")
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+	@ApiOperation({
+		summary: "Paystack settlements (live)",
+		description: "Proxies Paystack GET /settlement for bank payout history.",
+	})
+	async getPaystackSettlements(@Query() query: PaystackSettlementsQueryDto) {
+		return this.adminService.getPaystackSettlements(query);
 	}
 }
