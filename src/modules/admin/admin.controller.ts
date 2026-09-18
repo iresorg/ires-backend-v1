@@ -181,12 +181,14 @@ export class AdminController {
 	@ApiOperation({
 		summary: "Get subscribers / PAYG customers",
 		description:
-			"Lists recurring subscribers by default. Pass paymentType=one_time for pay-as-you-go customers. Each row includes paymentType.",
+			"Omitting paymentType returns all customers (recurring + pay-as-you-go). Pass paymentType=subscription or one_time to filter. Each row includes paymentType.",
 	})
 	@ApiQuery({
 		name: "paymentType",
 		required: false,
 		enum: ["subscription", "one_time"],
+		description:
+			"Optional filter. Omit to list every subscriber type together.",
 	})
 	@ApiResponse({
 		status: 200,

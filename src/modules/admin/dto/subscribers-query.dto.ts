@@ -32,7 +32,7 @@ export class SubscribersQueryDto {
 
 	@ApiPropertyOptional({
 		description:
-			"subscription = recurring subscribers. one_time = pay-as-you-go purchasers/credits.",
+			"Omit to return all (subscription + one_time). subscription = recurring only. one_time = pay-as-you-go purchasers/credits.",
 		enum: PlanPaymentType,
 		example: PlanPaymentType.SUBSCRIPTION,
 	})
