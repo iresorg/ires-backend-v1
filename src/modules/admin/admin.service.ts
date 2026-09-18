@@ -296,8 +296,11 @@ export class AdminService {
 		return status;
 	}
 
-	async getSubscriptionPlans() {
-		return await this.subscriptionsRepo.findAllPlansForAdmin();
+	async getSubscriptionPlans(filters?: {
+		accountType?: "individual" | "organization";
+		paymentType?: string;
+	}) {
+		return await this.subscriptionsRepo.findAllPlansForAdmin(filters);
 	}
 
 	async createSubscriptionPlan(dto: CreateSubscriptionPlanDto) {

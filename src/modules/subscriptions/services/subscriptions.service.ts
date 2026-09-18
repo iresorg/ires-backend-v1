@@ -28,12 +28,9 @@ export class SubscriptionsService {
 		accountType?: "individual" | "organization",
 		paymentType?: PlanPaymentType | string,
 	) {
-		const plans = await this.repo.findAllPlans(accountType);
-		const filtered = paymentType
-			? plans.filter((plan) => plan.paymentType === paymentType)
-			: plans;
+		const plans = await this.repo.findAllPlans(accountType, paymentType);
 		// Hide internal integration fields (e.g., paystackPlanCode)
-		return filtered.map((plan) => ({
+		return plans.map((plan) => ({
 			id: plan.id,
 			name: plan.name,
 			tier: plan.tier,

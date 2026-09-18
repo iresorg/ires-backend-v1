@@ -44,10 +44,12 @@ GET /api/v1/subscriptions/plans?accountType=individual
 GET /api/v1/subscriptions/plans?accountType=organization
 GET /api/v1/subscriptions/plans?paymentType=subscription
 GET /api/v1/subscriptions/plans?paymentType=one_time
+GET /api/v1/subscriptions/plans?accountType=individual&paymentType=one_time
 ```
 
 `accountType` is optional: `individual` | `organization`.  
-`paymentType` is optional: `subscription` | `one_time`.
+`paymentType` is optional: `subscription` | `one_time`.  
+Combine both when needed (e.g. individual + one_time).
 
 ### Response
 
@@ -104,7 +106,19 @@ This is the **staff** login token (same as other `/admin` routes), not the publi
 
 ```
 GET /api/v1/admin/subscription-plans
+GET /api/v1/admin/subscription-plans?paymentType=subscription
+GET /api/v1/admin/subscription-plans?paymentType=one_time
+GET /api/v1/admin/subscription-plans?accountType=individual
+GET /api/v1/admin/subscription-plans?accountType=organization
+GET /api/v1/admin/subscription-plans?accountType=individual&paymentType=one_time
 ```
+
+| Query | Values | Required |
+|---|---|---|
+| `accountType` | `individual` \| `organization` | no |
+| `paymentType` | `subscription` \| `one_time` | no |
+
+Omit both to list every plan (active + inactive).
 
 ```json
 {
@@ -130,7 +144,9 @@ GET /api/v1/admin/subscription-plans
 }
 ```
 
-Admin UI can show `paystackPlanCode` as read-only (subscriptions only; null for one_time).
+Admin UI can show `paystackPlanCode` as read-only (subscriptions only; `null` for one_time).
+
+Use tabs/filters in the admin plan manager the same way as public pricing: **Account type** × **Payment type**.
 
 ### 2.2 Create a plan
 
@@ -345,4 +361,6 @@ On **public plan cards**, show `features` the same way: a list of chips or compa
 | Who | Anyone | SUPER_ADMIN / ADMIN |
 | Inactive plans | hidden | included |
 | Paystack code | hidden | included |
+| Filter `accountType` | yes | yes |
+| Filter `paymentType` | yes (`subscription` \| `one_time`) | yes (`subscription` \| `one_time`) |
 | Use for | pricing / checkout | manage catalog |

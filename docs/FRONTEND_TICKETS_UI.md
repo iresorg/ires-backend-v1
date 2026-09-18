@@ -67,6 +67,8 @@ Response `data`:
 
 ## Catalog filters
 
+### Public (active only)
+
 ```
 GET /api/v1/subscriptions/plans
 GET /api/v1/subscriptions/plans?accountType=individual
@@ -75,6 +77,21 @@ GET /api/v1/subscriptions/plans?paymentType=subscription
 GET /api/v1/subscriptions/plans?paymentType=one_time
 GET /api/v1/subscriptions/plans?accountType=individual&paymentType=one_time
 ```
+
+### Admin (includes inactive)
+
+```
+GET /api/v1/admin/subscription-plans
+GET /api/v1/admin/subscription-plans?paymentType=subscription
+GET /api/v1/admin/subscription-plans?paymentType=one_time
+GET /api/v1/admin/subscription-plans?accountType=individual
+GET /api/v1/admin/subscription-plans?accountType=organization&paymentType=subscription
+```
+
+| Query | Values |
+|---|---|
+| `accountType` | `individual` \| `organization` |
+| `paymentType` | `subscription` \| `one_time` |
 
 | `paymentType` | Meaning |
 |---|---|
@@ -107,6 +124,7 @@ Body (both): `{ "planId": "uuid", "callbackUrl": "https://..." }`
 ### Frontend
 
 - Pricing tabs: **Subscriptions** vs **Pay as you go** (`paymentType` filter) × Individual / Organization
+- Admin plan list: same filters on `GET /admin/subscription-plans`
 - Admin plan form: required `paymentType` select
 - Ticket create: eligibility still uses active sub **or** unused PAYG credit
 

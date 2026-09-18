@@ -273,10 +273,26 @@ export class AdminController {
 	@ApiOperation({
 		summary: "List all subscription plans",
 		description:
-			"Returns every subscription plan, including inactive ones. Use this to edit amounts, features, and availability.",
+			"Returns every subscription plan, including inactive ones. Filter by accountType and/or paymentType.",
 	})
-	async getSubscriptionPlans() {
-		const plans = await this.adminService.getSubscriptionPlans();
+	@ApiQuery({
+		name: "accountType",
+		required: false,
+		enum: ["individual", "organization"],
+	})
+	@ApiQuery({
+		name: "paymentType",
+		required: false,
+		enum: ["subscription", "one_time"],
+	})
+	async getSubscriptionPlans(
+		@Query("accountType") accountType?: "individual" | "organization",
+		@Query("paymentType") paymentType?: string,
+	) {
+		const plans = await this.adminService.getSubscriptionPlans({
+			accountType,
+			paymentType,
+		});
 		return { plans };
 	}
 

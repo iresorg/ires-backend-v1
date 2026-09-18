@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 import { Subscription } from "../entities/subscription.entity";
 import { SubscriptionPlan } from "../entities/subscription-plan.entity";
 import { SubscriptionStatus } from "../entities/subscription.entity";
+import { PlanPaymentType } from "../enums/plan-payment-type.enum";
 
 @Injectable()
 export class SubscriptionsRepository {
@@ -26,24 +27,50 @@ export class SubscriptionsRepository {
 		});
 	}
 
-	async findAllPlans(accountType?: "individual" | "organization") {
+	async findAllPlans(
+		accountType?: "individual" | "organization",
+		paymentType?: PlanPaymentType | string,
+	) {
+		const where: {
+			active: boolean;
+			accountType?: "individual" | "organization";
+			paymentType?: PlanPaymentType;
+		} = { active: true };
+
 		if (accountType) {
-			const normalized = accountType.toLowerCase().trim() as
+			where.accountType = accountType.toLowerCase().trim() as
 				| "individual"
 				| "organization";
-			return await this.plans.find({
-				where: { accountType: normalized, active: true },
-				order: { tier: "ASC" },
-			});
 		}
+
+		if (paymentType) {
+			where.paymentType = paymentType as PlanPaymentType;
+		}
+
 		return await this.plans.find({
-			where: { active: true },
+			where,
 			order: { tier: "ASC" },
 		});
 	}
 
-	async findAllPlansForAdmin() {
+	async findAllPlansForAdmin(filters?: {
+		accountType?: "individual" | "organization";
+		paymentType?: PlanPaymentType | string;
+	}) {
+		const where: {
+			accountType?: "individual" | "organization";
+			paymentType?: PlanPaymentType;
+		} = {};
+
+		if (filters?.accountType) {
+			where.accountType = filters.accountType;
+		}
+		if (filters?.paymentType) {
+			where.paymentType = filters.paymentType as PlanPaymentType;
+		}
+
 		return await this.plans.find({
+			where: Object.keys(where).length ? where : undefined,
 			order: { accountType: "ASC", tier: "ASC" },
 		});
 	}
