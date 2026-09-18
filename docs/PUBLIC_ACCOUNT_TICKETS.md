@@ -43,6 +43,8 @@ Wrong ticket → `403 Forbidden` (`You do not have access to this ticket`).
 
 ## List my tickets
 
+**Paginated** — same shape as admin `GET /tickets`. Pass `page` / `limit` and use `pagination` for the UI.
+
 ```http
 GET /api/v1/accounts/tickets
 GET /api/v1/accounts/tickets?page=1&limit=10
@@ -52,8 +54,8 @@ GET /api/v1/accounts/tickets?status=RESOLVED&page=1&limit=20
 
 | Query | Type | Notes |
 |---|---|---|
-| `page` | number | Optional pagination |
-| `limit` | number | Optional page size |
+| `page` | number | Optional — default `1` |
+| `limit` | number | Optional — default `10` (min `5` if sent) |
 | `status` | enum | Optional filter — see status values below |
 
 ### Response shape
@@ -81,11 +83,12 @@ GET /api/v1/accounts/tickets?status=RESOLVED&page=1&limit=20
       "entitlementSource": "subscription"
     }
   ],
-  "meta": {
-    "total": 3,
-    "page": 1,
-    "limit": 10,
-    "totalPages": 1
+  "pagination": {
+    "totalItems": 3,
+    "totalPages": 1,
+    "currentPage": 1,
+    "nextPage": null,
+    "prevPage": null
   }
 }
 ```
@@ -148,6 +151,8 @@ Includes: description, location, reporter, attachments, contact / victim info (w
 
 ## Ticket lifecycle (timeline)
 
+**Paginated.**
+
 ```http
 GET /api/v1/accounts/tickets/:ticketId/lifecycle?page=1&limit=10
 ```
@@ -172,7 +177,13 @@ Use for the dashboard activity / status timeline.
       }
     }
   ],
-  "meta": { "total": 4, "page": 1, "limit": 10, "totalPages": 1 }
+  "pagination": {
+    "totalItems": 4,
+    "totalPages": 1,
+    "currentPage": 1,
+    "nextPage": null,
+    "prevPage": null
+  }
 }
 ```
 
@@ -201,9 +212,9 @@ Detail
 ### Acceptance checklist
 
 - [ ] List only shows tickets for the logged-in account
-- [ ] Status filter + pagination
+- [ ] Status filter + pagination (`pagination.totalPages` / next-prev)
 - [ ] Detail hides internal staff notes
-- [ ] Lifecycle timeline updates as staff move the ticket
+- [ ] Lifecycle timeline updates as staff move the ticket (paginated)
 - [ ] Empty state when no tickets
 - [ ] 403 / error toast when opening another account’s `ticketId`
 

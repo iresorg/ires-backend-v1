@@ -188,30 +188,82 @@ Admin must seed **at least one category** before the create-ticket form is usabl
 
 ---
 
-## Ticket FE-2 — Ticket list
+## Ticket FE-2 — Ticket list (admin / staff)
 
 **Goal:** Paginated ticket inbox for ops / responders.
+
+**Already paginated on the backend** — FE must pass `page` / `limit` and render from `pagination`.
 
 ### API
 
 ```
+GET /tickets?page=1&limit=10
 GET /tickets?page=1&limit=10&status=CREATED
 ```
 
-`status` optional. Values:
+| Query | Required | Notes |
+|---|---|---|
+| `page` | no | Default `1` |
+| `limit` | no | Default `10` (min `5` if sent) |
+| `status` | no | Filter |
+
+`status` values:
 
 `CREATED` | `PENDING` | `ANALYSING` | `ASSIGNED` | `REASSIGNED` | `IN_PROGRESS` | `RESOLVED` | `CLOSED` | `ESCALATED`
 
+### Response shape
+
+```json
+{
+  "message": "Tickets fetched successfully",
+  "data": [
+    {
+      "ticketId": "iRS-…",
+      "title": "…",
+      "status": "CREATED",
+      "severity": null,
+      "tier": "TIER_1",
+      "category": { "id": "uuid", "name": "…", "createdAt": "…" },
+      "subCategory": { "id": "uuid", "name": "…", "createdAt": "…" },
+      "createdFor": {
+        "id": "uuid",
+        "email": "customer@example.com",
+        "role": "individual",
+        "status": "active"
+      },
+      "entitlementSource": "subscription",
+      "createdAt": "…",
+      "updatedAt": "…"
+    }
+  ],
+  "pagination": {
+    "totalItems": 42,
+    "totalPages": 5,
+    "currentPage": 1,
+    "nextPage": 2,
+    "prevPage": null
+  }
+}
+```
+
 ### Summary fields (list row)
 
-`ticketId`, `title`, `status`, `severity`, `tier`, `category`, `subCategory`, `createdAt`, `updatedAt`
+`ticketId`, `title`, `status`, `severity`, `tier`, `category`, `subCategory`, **`createdFor`**, **`entitlementSource`**, `createdAt`, `updatedAt`
 
 ### UI acceptance
 
-- [ ] Table / list with status filter + pagination
+- [ ] Table / list with status filter + **pagination** (`pagination.totalPages` / next-prev)
 - [ ] Show category / sub-category names
+- [ ] Show customer (`createdFor.email`) and entitlement (`subscription` / `payg`)
 - [ ] Click row → detail
 - [ ] Status badges for each enum value
+
+Same pagination pattern on:
+
+- `GET /tickets/:ticketId/lifecycle?page=&limit=`
+- `GET /tickets/escalation-history?page=&limit=`
+
+Customer portal list (separate app) → [`PUBLIC_ACCOUNT_TICKETS.md`](./PUBLIC_ACCOUNT_TICKETS.md) (`GET /accounts/tickets`).
 
 ---
 
