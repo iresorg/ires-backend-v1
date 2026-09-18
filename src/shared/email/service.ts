@@ -181,6 +181,27 @@ export class EmailService {
 		await this.emailConsumer.publishEmailToQueue(payload);
 	}
 
+	async sendSubscriptionEndedEmail(
+		email: string,
+		userName: string,
+		planName: string,
+		renewUrl?: string,
+	): Promise<void> {
+		const payload: EmailPayload<"SubscriptionEnded"> = {
+			to: [email],
+			from: this.from,
+			subject: "Subscription Expired",
+			template: "SubscriptionEnded",
+			options: {
+				userName,
+				planName,
+				renewUrl,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
 	async sendPaymentFailedEmail(
 		email: string,
 		userName: string,
