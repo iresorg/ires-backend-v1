@@ -5,6 +5,7 @@ export interface EmailPayload<T = TemplateName> {
 	to: string | string[];
 	subject: string;
 	template: T;
+	replyTo?: string;
 	options: T extends TemplateName
 		? TemplateProps<T>
 		: Record<string, unknown>;
