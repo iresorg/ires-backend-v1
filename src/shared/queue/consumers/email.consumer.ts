@@ -20,6 +20,7 @@ import SubscriptionCancelled from "@/shared/email/templates/SubscriptionCancelle
 import PaymentFailed from "@/shared/email/templates/PaymentFailed";
 import SubscriptionEnded from "@/shared/email/templates/SubscriptionEnded";
 import TicketStatusUpdate from "@/shared/email/templates/TicketStatusUpdate";
+import ContactInquiry from "@/shared/email/templates/ContactInquiry";
 
 export const templates = {
 	NewUser,
@@ -33,6 +34,7 @@ export const templates = {
 	SubscriptionCancelled,
 	PaymentFailed,
 	SubscriptionEnded,
+	ContactInquiry,
 };
 
 @Injectable()
@@ -82,7 +84,7 @@ export class EmailConsumer implements OnModuleInit {
 			if (!message) return;
 
 			const { content } = message;
-			const { from, to, subject, template, options } = JSON.parse(
+			const { from, to, subject, template, options, replyTo } = JSON.parse(
 				content.toString(),
 			) as EmailPayload;
 
@@ -92,7 +94,7 @@ export class EmailConsumer implements OnModuleInit {
 			}
 			const emailBody = await render(component(options));
 
-			await this.sendMail({ from, to, subject, html: emailBody });
+			await this.sendMail({ from, to, subject, html: emailBody, replyTo });
 
 			this.queueService.acknowledgeMessage(message);
 		} catch (error) {
@@ -112,17 +114,20 @@ export class EmailConsumer implements OnModuleInit {
 		to,
 		subject,
 		html,
+		replyTo,
 	}: {
 		from: string;
 		to: string | string[];
 		subject: string;
 		html: string;
+		replyTo?: string;
 	}) {
 		await this.mailer.sendMail({
 			from,
 			to,
 			subject,
 			html,
+			...(replyTo ? { replyTo } : {}),
 			headers: {
 				"X-PM-Message-Stream": "outbound",
 			},
