@@ -41,6 +41,7 @@ export class AuthService {
 			email: user.email,
 			role: user.role,
 			type: "user",
+			tv: user.tokenVersion ?? 0,
 		};
 
 		const token = this.utils.generateJWT(payload);
@@ -90,5 +91,10 @@ export class AuthService {
 
 		const newPasswordHash = await this.utils.createHash(body.newPassword);
 		await this.usersService.update(userId, { password: newPasswordHash });
+		await this.usersService.incrementTokenVersion(userId);
+	}
+
+	async logout(userId: string) {
+		await this.usersService.incrementTokenVersion(userId);
 	}
 }

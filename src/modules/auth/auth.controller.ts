@@ -55,4 +55,20 @@ export class AuthController {
 			message: "Password changed successfully",
 		};
 	}
+
+	@HttpCode(HttpStatus.OK)
+	@Post("logout")
+	@ApiOperation({
+		summary: "Logout",
+		description:
+			"Ends every active staff session. Previously issued JWTs are rejected.",
+	})
+	@ApiResponse({
+		status: 200,
+		description: "Logged out successfully",
+	})
+	async logout(@Req() req: AuthRequest) {
+		await this.authService.logout(req.user.id);
+		return { message: "Logged out successfully" };
+	}
 }

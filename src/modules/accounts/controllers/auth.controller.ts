@@ -593,7 +593,7 @@ export class AccountsAuthController {
 	@ApiOperation({
 		summary: "Logout",
 		description:
-			"Logout from the current session. Note: For JWT-based authentication, logout is handled client-side by discarding the token.",
+			"Ends every active session for this account. Previously issued JWTs are rejected.",
 	})
 	@ApiResponse({
 		status: 200,
@@ -609,7 +609,7 @@ export class AccountsAuthController {
 		status: 401,
 		description: "Unauthorized - Invalid or missing token",
 	})
-	logout() {
-		return this.accountsService.logout();
+	logout(@Req() req: any) {
+		return this.accountsService.logout(req.user.id);
 	}
 }

@@ -46,6 +46,13 @@ export class AuthGuard implements CanActivate {
 			throw new UnauthorizedException("User not found");
 		}
 
+		const tokenVersion = typeof payload.tv === "number" ? payload.tv : 0;
+		if (tokenVersion !== (user.tokenVersion ?? 0)) {
+			throw new UnauthorizedException(
+				"Session has ended. Please login again.",
+			);
+		}
+
 		// Set the user object with all required fields
 		request.user = {
 			id: user.id,

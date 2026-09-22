@@ -22,6 +22,7 @@ export class StartupSeederService implements OnModuleInit {
 	async onModuleInit() {
 		try {
 			this.logger.log("Running startup seeder...");
+			await this.ensureTokenVersionColumns();
 			await this.seedSuperAdmin();
 			await this.seedSubscriptionPlans();
 			await this.ensurePaygPlans();
@@ -32,6 +33,17 @@ export class StartupSeederService implements OnModuleInit {
 				error.stack,
 			);
 		}
+	}
+
+	private async ensureTokenVersionColumns() {
+		await this.dataSource.query(`
+			ALTER TABLE "accounts"
+			ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0
+		`);
+		await this.dataSource.query(`
+			ALTER TABLE "users"
+			ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0
+		`);
 	}
 
 	private async seedSuperAdmin() {

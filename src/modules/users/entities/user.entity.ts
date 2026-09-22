@@ -31,6 +31,10 @@ export class User extends BaseEntity {
 	@Column({ type: "varchar", nullable: true, name: "last_login" })
 	lastLogin: Date;
 
+	/** Bumped on logout and password change so previously issued JWTs are rejected. */
+	@Column({ type: "int", name: "token_version", default: 0 })
+	tokenVersion: number;
+
 	@Column({ nullable: true, type: "jsonb" })
 	avatar: {
 		publicId: string;

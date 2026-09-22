@@ -5,6 +5,7 @@ export interface UserAuthPayload {
 	role: Role;
 	email: string;
 	type: "user";
+	tv?: number;
 }
 
 export type AuthPayload = UserAuthPayload;

@@ -28,6 +28,10 @@ export class Account extends BaseEntity {
 	@Column({ type: "timestamptz", name: "last_login", nullable: true })
 	lastLogin: Date | null;
 
+	/** Bumped on logout and password change so previously issued JWTs are rejected. */
+	@Column({ type: "int", name: "token_version", default: 0 })
+	tokenVersion: number;
+
 	@OneToOne(() => IndividualProfile, (p) => p.account)
 	individualProfile?: IndividualProfile;
 

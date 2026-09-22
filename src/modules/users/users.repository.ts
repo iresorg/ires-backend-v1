@@ -189,6 +189,11 @@ console.log(users)
 			createdAt: data.createdAt,
 			updatedAt: data.updatedAt,
 			lastLogin: data.lastLogin,
+			tokenVersion: data.tokenVersion ?? 0,
 		};
+	}
+
+	async incrementTokenVersion(id: string): Promise<void> {
+		await this.userRepo.increment({ id }, "tokenVersion", 1);
 	}
 }
