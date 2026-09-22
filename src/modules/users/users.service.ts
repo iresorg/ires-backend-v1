@@ -107,6 +107,10 @@ export class UsersService {
 		return { users, total, totalPages };
 	}
 
+	async incrementTokenVersion(id: string): Promise<void> {
+		await this.usersRepository.incrementTokenVersion(id);
+	}
+
 	async findOne(filter: {
 		id?: string;
 		email?: string;

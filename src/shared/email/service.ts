@@ -257,4 +257,30 @@ export class EmailService {
 
 		await this.emailConsumer.publishEmailToQueue(payload);
 	}
+
+	async sendContactInquiryEmail(params: {
+		name: string;
+		email: string;
+		phone: string;
+		subject: string;
+		message: string;
+	}): Promise<void> {
+		const payload: EmailPayload<"ContactInquiry"> = {
+			to: [this.from],
+			from: this.from,
+			replyTo: params.email,
+			subject: `Contact inquiry: ${params.subject}`,
+			template: "ContactInquiry",
+			options: {
+				headerText: "New contact inquiry",
+				name: params.name,
+				email: params.email,
+				phone: params.phone,
+				subject: params.subject,
+				message: params.message,
+			},
+		};
+
+		await this.emailConsumer.publishEmailToQueue(payload);
+	}
 }

@@ -138,6 +138,7 @@ export class AccountsService {
 			email: account.email,
 			role: account.role,
 			aud: "portal",
+			tv: account.tokenVersion ?? 0,
 		});
 		return { token };
 	}
@@ -331,6 +332,7 @@ export class AccountsService {
 
 		const passwordHash = await this.utils.createHash(dto.newPassword);
 		await this.repo.updatePassword(account.id, passwordHash);
+		await this.repo.incrementTokenVersion(account.id);
 		await this.repo.markPasswordResetUsed(resetRecord.id);
 
 		return { message: "Password has been reset successfully" };
@@ -438,12 +440,13 @@ export class AccountsService {
 
 		const passwordHash = await this.utils.createHash(dto.newPassword);
 		await this.repo.updatePassword(accountId, passwordHash);
+		await this.repo.incrementTokenVersion(accountId);
 
 		return { message: "Password changed successfully" };
 	}
 
-	logout() {
-		// Logout is stateless with JWT, just return success
+	async logout(accountId: string) {
+		await this.repo.incrementTokenVersion(accountId);
 		return { message: "Logged out successfully" };
 	}
 }

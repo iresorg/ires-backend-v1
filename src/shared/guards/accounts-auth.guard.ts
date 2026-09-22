@@ -31,6 +31,13 @@ export class AccountsAuthGuard implements CanActivate {
 		const account = await this.accountsRepo.findById(payload.id);
 		if (!account) throw new UnauthorizedException("Account not found");
 
+		const tokenVersion = typeof payload.tv === "number" ? payload.tv : 0;
+		if (tokenVersion !== (account.tokenVersion ?? 0)) {
+			throw new UnauthorizedException(
+				"Session has ended. Please login again.",
+			);
+		}
+
 		request.user = {
 			id: account.id,
 			email: account.email,

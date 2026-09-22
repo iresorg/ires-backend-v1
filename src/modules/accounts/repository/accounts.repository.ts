@@ -94,6 +94,10 @@ export class AccountsRepository {
 		await this.accounts.update({ id: accountId }, { passwordHash });
 	}
 
+	async incrementTokenVersion(accountId: string): Promise<void> {
+		await this.accounts.increment({ id: accountId }, "tokenVersion", 1);
+	}
+
 	async updateIndividualProfile(
 		accountId: string,
 		data: Partial<IndividualProfile>,
