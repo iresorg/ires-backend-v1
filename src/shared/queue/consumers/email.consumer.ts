@@ -114,19 +114,22 @@ export class EmailConsumer implements OnModuleInit {
 		to,
 		subject,
 		html,
+		text,
 		replyTo,
 	}: {
 		from: string;
 		to: string | string[];
 		subject: string;
-		html: string;
+		html?: string;
+		text?: string;
 		replyTo?: string;
 	}) {
 		await this.mailer.sendMail({
 			from,
 			to,
 			subject,
-			html,
+			...(html ? { html } : {}),
+			...(text ? { text } : {}),
 			...(replyTo ? { replyTo } : {}),
 			headers: {
 				"X-PM-Message-Stream": "outbound",
