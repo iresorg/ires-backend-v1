@@ -111,6 +111,10 @@ export class UsersService {
 		await this.usersRepository.incrementTokenVersion(id);
 	}
 
+	async setMustChangePassword(id: string, value: boolean): Promise<void> {
+		await this.usersRepository.setMustChangePassword(id, value);
+	}
+
 	async findOne(filter: {
 		id?: string;
 		email?: string;

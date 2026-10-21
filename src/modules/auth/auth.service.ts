@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
 import { UsersService } from "../users/users.service";
 import { Utils } from "@/utils/utils";
 import type { LoginDto, LoginResponseDto } from "./dto/login";
@@ -55,23 +55,26 @@ export class AuthService {
 				id: user.id,
 				avatar: user.avatar,
 				status: user.status,
+				mustChangePassword: user.mustChangePassword ?? false,
 			},
 			accessToken: token,
 		};
 	}
 
-	async changePassword(
-		body: ChangePasswordDto,
-		userId: string,
-	): Promise<void> {
+	async changePassword(body: ChangePasswordDto, userId: string) {
 		const user = await this.usersService.findOne({ id: userId });
 		if (!user) {
 			throw new UserNotFoundError("User not found");
 		}
 
+		const currentPassword = body.currentPassword || body.oldPassword;
+		if (!currentPassword) {
+			throw new BadRequestException("currentPassword is required");
+		}
+
 		const oldPasswordMatch = await this.utils.ensureHashMatchesText(
 			user.password,
-			body.oldPassword,
+			currentPassword,
 		);
 
 		if (!oldPasswordMatch) {
@@ -91,7 +94,22 @@ export class AuthService {
 
 		const newPasswordHash = await this.utils.createHash(body.newPassword);
 		await this.usersService.update(userId, { password: newPasswordHash });
+		await this.usersService.setMustChangePassword(userId, false);
 		await this.usersService.incrementTokenVersion(userId);
+
+		const updated = await this.usersService.findOne({ id: userId });
+		const accessToken = this.utils.generateJWT({
+			id: user.id,
+			email: user.email,
+			role: user.role,
+			type: "user" as const,
+			tv: updated?.tokenVersion ?? (user.tokenVersion ?? 0) + 1,
+		});
+
+		return {
+			mustChangePassword: false,
+			accessToken,
+		};
 	}
 
 	async logout(userId: string) {

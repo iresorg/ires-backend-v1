@@ -34,6 +34,12 @@ export class UserResponseDto {
 	@ApiProperty({ description: "Last update timestamp" })
 	updatedAt: Date;
 
+	@ApiProperty({
+		description:
+			"True when this user must replace a temporary password before using the app",
+	})
+	mustChangePassword: boolean;
+
 	/**
 	 * Transform IUser to UserResponseDto, excluding password
 	 */

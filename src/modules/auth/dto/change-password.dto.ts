@@ -1,18 +1,30 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsNotEmpty, IsOptional, IsString, MinLength, ValidateIf } from "class-validator";
 
 export class ChangePasswordDto {
 	@ApiProperty({
-		example: "password123",
-		description: "User new password",
+		example: "TempPass1",
+		description:
+			"Current password. For a first login this is the temporary password from the welcome email.",
 	})
-	@IsString({ message: "Password must be a string" })
-	newPassword: string;
+	@ValidateIf((o: ChangePasswordDto) => !o.oldPassword)
+	@IsString()
+	@IsNotEmpty()
+	currentPassword?: string;
+
+	@ApiPropertyOptional({
+		description: "Accepted alias for currentPassword",
+	})
+	@IsOptional()
+	@IsString()
+	oldPassword?: string;
 
 	@ApiProperty({
-		example: "password123",
-		description: "User old password",
+		example: "NewSecurePass1",
+		description: "New password. Minimum 8 characters.",
 	})
-	@IsString({ message: "Password must be a string" })
-	oldPassword: string;
+	@IsString()
+	@IsNotEmpty()
+	@MinLength(8)
+	newPassword: string;
 }

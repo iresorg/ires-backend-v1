@@ -44,6 +44,10 @@ export class StartupSeederService implements OnModuleInit {
 			ALTER TABLE "users"
 			ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0
 		`);
+		await this.dataSource.query(`
+			ALTER TABLE "users"
+			ADD COLUMN IF NOT EXISTS "must_change_password" boolean NOT NULL DEFAULT false
+		`);
 	}
 
 	private async seedSuperAdmin() {

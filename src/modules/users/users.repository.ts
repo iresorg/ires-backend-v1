@@ -147,6 +147,7 @@ console.log(users)
 			password,
 			role,
 			avatar,
+			mustChangePassword: true,
 		});
 
 		const savedUser = await this.userRepo.save(newUser);
@@ -190,10 +191,15 @@ console.log(users)
 			updatedAt: data.updatedAt,
 			lastLogin: data.lastLogin,
 			tokenVersion: data.tokenVersion ?? 0,
+			mustChangePassword: data.mustChangePassword ?? false,
 		};
 	}
 
 	async incrementTokenVersion(id: string): Promise<void> {
 		await this.userRepo.increment({ id }, "tokenVersion", 1);
+	}
+
+	async setMustChangePassword(id: string, value: boolean): Promise<void> {
+		await this.userRepo.update({ id }, { mustChangePassword: value });
 	}
 }
