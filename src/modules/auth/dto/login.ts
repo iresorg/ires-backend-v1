@@ -27,5 +27,6 @@ export class LoginResponseDto {
 		role: string;
 		avatar?: { publicId: string; url: string };
 		status?: string;
+		mustChangePassword: boolean;
 	};
 }

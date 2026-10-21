@@ -12,6 +12,10 @@ export class AddTokenVersion1770000000003 implements MigrationInterface {
 			ALTER TABLE "users"
 			ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0
 		`);
+		await queryRunner.query(`
+			ALTER TABLE "users"
+			ADD COLUMN IF NOT EXISTS "must_change_password" boolean NOT NULL DEFAULT false
+		`);
 	}
 
 	public async down(queryRunner: QueryRunner): Promise<void> {
@@ -20,6 +24,9 @@ export class AddTokenVersion1770000000003 implements MigrationInterface {
 		`);
 		await queryRunner.query(`
 			ALTER TABLE "users" DROP COLUMN IF EXISTS "token_version"
+		`);
+		await queryRunner.query(`
+			ALTER TABLE "users" DROP COLUMN IF EXISTS "must_change_password"
 		`);
 	}
 }

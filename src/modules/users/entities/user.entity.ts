@@ -35,6 +35,10 @@ export class User extends BaseEntity {
 	@Column({ type: "int", name: "token_version", default: 0 })
 	tokenVersion: number;
 
+	/** True when the user still has a temporary password from account creation. */
+	@Column({ type: "boolean", name: "must_change_password", default: false })
+	mustChangePassword: boolean;
+
 	@Column({ nullable: true, type: "jsonb" })
 	avatar: {
 		publicId: string;

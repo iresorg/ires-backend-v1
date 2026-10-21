@@ -40,7 +40,11 @@ export class AuthController {
 
 	@HttpCode(HttpStatus.OK)
 	@Post("change-password")
-	@ApiOperation({ summary: "Change user password" })
+	@ApiOperation({
+		summary: "Change password",
+		description:
+			"Any signed-in staff user (super admin, admin, agent admin, agent, responder admin, responder) can replace their password. The current password is the temporary one from the welcome email on first login. Returns a new access token because the previous token is revoked.",
+	})
 	@ApiResponse({
 		status: 200,
 		description: "Password changed successfully",
@@ -49,10 +53,12 @@ export class AuthController {
 		@Body() body: ChangePasswordDto,
 		@Req() req: AuthRequest,
 	) {
-		await this.authService.changePassword(body, req.user.id);
+		const result = await this.authService.changePassword(body, req.user.id);
 
 		return {
 			message: "Password changed successfully",
+			mustChangePassword: result.mustChangePassword,
+			accessToken: result.accessToken,
 		};
 	}
 

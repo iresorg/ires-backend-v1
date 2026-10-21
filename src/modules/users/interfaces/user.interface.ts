@@ -17,6 +17,7 @@ export interface IUser {
 	deletedAt?: Date;
 	lastLogin?: Date;
 	tokenVersion?: number;
+	mustChangePassword?: boolean;
 }
 
 export interface IUserCreate {
