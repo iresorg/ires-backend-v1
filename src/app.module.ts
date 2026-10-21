@@ -24,6 +24,7 @@ import { SubscriptionsModule } from "./modules/subscriptions/subscriptions.modul
 import { AdminModule } from "./modules/admin/admin.module";
 import { NewsletterModule } from "./modules/newsletter/newsletter.module";
 import { ContactModule } from "./modules/contact/contact.module";
+import { IncidentReportsModule } from "./modules/incident-reports/incident-reports.module";
 import { StartupSeederService } from "./shared/database/startup-seeder.service";
 import { ScheduleModule } from "@nestjs/schedule";
 import { KeepAliveModule } from "./shared/keep-alive/keep-alive.module";
@@ -49,6 +50,7 @@ import { KeepAliveModule } from "./shared/keep-alive/keep-alive.module";
 		AdminModule,
 		NewsletterModule,
 		ContactModule,
+		IncidentReportsModule,
 		TicketsModule,
 		TicketCategoriesModule,
 		AgentsModule,

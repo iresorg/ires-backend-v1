@@ -51,11 +51,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 			});
 		}
 
+		const hideInternal =
+			status >= HttpStatus.INTERNAL_SERVER_ERROR &&
+			!(exception instanceof HttpException);
+
 		response.status(status).json({
-			message:
-				status >= HttpStatus.INTERNAL_SERVER_ERROR
-					? "Something went wrong"
-					: message,
+			message: hideInternal ? "Something went wrong" : message,
 			error: true,
 			timestamp: new Date().toISOString(),
 		});

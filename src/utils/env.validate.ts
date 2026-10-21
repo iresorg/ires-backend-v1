@@ -4,6 +4,7 @@ import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
+	IsEmail,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -73,6 +74,9 @@ export class EnvVariables {
 	@IsString()
 	@IsNotEmpty()
 	EMAIL_FROM: string;
+
+	@IsEmail()
+	SUPPORT_EMAIL: string;
 
 	@IsString()
 	@IsNotEmpty()
