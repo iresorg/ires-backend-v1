@@ -284,6 +284,21 @@ export class EmailService {
 		await this.emailConsumer.publishEmailToQueue(payload);
 	}
 
+	async sendHtmlEmail(params: {
+		to: string;
+		replyTo?: string;
+		subject: string;
+		html: string;
+	}): Promise<void> {
+		await this.emailConsumer.sendMail({
+			from: this.from,
+			to: params.to,
+			replyTo: params.replyTo,
+			subject: params.subject,
+			html: params.html,
+		});
+	}
+
 	async sendPlainTextEmail(params: {
 		to: string;
 		replyTo?: string;

@@ -74,25 +74,26 @@ Trim strings. Reject empty required fields and any value outside those two lists
 | Reply-To | Reporter `email` |
 | Subject | `Incident report — {severity} — {incidentType}` |
 
-Body, plain text:
+The support message is an HTML email using the iRES template. It includes severity, incident type, whether it is ongoing, name, organization, phone, email, and the description. Detected time and affected systems are included only when the visitor filled them in.
 
-```
-Severity: Critical
-Incident type: Ransomware
-Ongoing: Yes
-Name: Ada Okonkwo
-Organization: Northwind Ltd
-Phone: 08031234567
-Email: ada@northwind.example
-Detected: 2026-10-21T14:30
-Affected systems: Email and file server
+| Header | Value |
+|---|---|
+| To | `SUPPORT_EMAIL` |
+| Reply-To | Reporter `email` |
+| Subject | `Incident report — {severity} — {incidentType}` |
 
-Staff cannot open shared files. A ransom note is on the desktop.
-```
+The reporter also receives an HTML confirmation at the email they submitted.
 
-Omit `Detected` and `Affected systems` when those fields are empty.
+| Header | Value |
+|---|---|
+| To | Reporter `email` |
+| Subject | `We received your incident report — {incidentReference}` |
 
-Send the email before returning success. If sending fails, return `500` so the page can tell the visitor to call the hotline. Do not respond with success when the email was not sent.
+Send the email before returning success. If sending the support email fails, return `500` so the page can tell the visitor to call the hotline. Do not respond with success when that email was not sent.
+
+The support email uses the iRES HTML template (severity, contact details, and the description). `Reply-To` is the reporter email.
+
+A second email, also from the iRES template, is sent to the reporter address: subject `We received your incident report`. If that confirmation fails after support already received the report, the API still returns success.
 
 ### Success
 
@@ -100,7 +101,8 @@ Send the email before returning success. If sending fails, return `500` so the p
 
 ```json
 {
-  "message": "Incident report received"
+  "message": "Incident report received",
+  "incidentReference": "IR-20261022-A1B2C3"
 }
 ```
 

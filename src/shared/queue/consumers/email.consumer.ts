@@ -21,6 +21,8 @@ import PaymentFailed from "@/shared/email/templates/PaymentFailed";
 import SubscriptionEnded from "@/shared/email/templates/SubscriptionEnded";
 import TicketStatusUpdate from "@/shared/email/templates/TicketStatusUpdate";
 import ContactInquiry from "@/shared/email/templates/ContactInquiry";
+import IncidentReportToSupport from "@/shared/email/templates/IncidentReportToSupport";
+import IncidentReportConfirmation from "@/shared/email/templates/IncidentReportConfirmation";
 
 export const templates = {
 	NewUser,
@@ -35,6 +37,8 @@ export const templates = {
 	PaymentFailed,
 	SubscriptionEnded,
 	ContactInquiry,
+	IncidentReportToSupport,
+	IncidentReportConfirmation,
 };
 
 @Injectable()
