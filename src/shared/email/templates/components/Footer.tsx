@@ -14,8 +14,8 @@ export default () => (
     <Row className="my-0">
       <Text className="text-gray-500 text-xs text-center mt-1.5 mb-0">
         Email:{" "}
-        <Link href="mailto:techsupport@iresorg.com">
-          techsupport@iresorg.com
+        <Link href="mailto:support@iresorg.com">
+          support@iresorg.com
         </Link>
       </Text>
     </Row>
@@ -23,21 +23,21 @@ export default () => (
     <Row className="my-0">
       <Column className="inline pr-2">
         <Text className="inline">
-          <Link href="https://ng.linkedin.com/company/ires" className="text-xs">
+          <Link href="https://www.linkedin.com/company/iresorg/" className="text-xs">
             LinkedIn
           </Link>
         </Text>
       </Column>
       <Column className="inline ">
         <Text className="inline">
-          <Link href="https://www.instagram.com/iRes" className="text-xs">
+          <Link href="https://www.instagram.com/iresorgg/" className="text-xs">
             Instagram
           </Link>
         </Text>
       </Column>
       <Column className="inline pl-2">
         <Text className="inline">
-          <Link href="https://twitter.com/iRes" className="text-xs">
+          <Link href="https://x.com/iRESorg?t=L-aamPkbfZi06TbjYsXfjA&s=09" className="text-xs">
             Twitter
           </Link>
         </Text>
