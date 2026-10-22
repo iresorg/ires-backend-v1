@@ -444,6 +444,12 @@ export class TicketsService {
 		);
 	}
 
+	async getDashboard(query: { page?: number; limit?: number }) {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+		return this.ticketsRepository.getDashboard(page, limit);
+	}
+
 	async assignTicket(
 		ticketId: string,
 		performedById: string,
