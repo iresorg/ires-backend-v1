@@ -46,7 +46,12 @@ export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
 
 	@Get()
-	@Roles(Role.SUPER_ADMIN)
+	@Roles(
+		Role.SUPER_ADMIN,
+		Role.ADMIN,
+		Role.AGENT_ADMIN,
+		Role.RESPONDER_ADMIN,
+	)
 	@ApiOperation({
 		summary: "Get all users with pagination",
 		description:

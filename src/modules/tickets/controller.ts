@@ -142,6 +142,31 @@ export class TicketsController {
 		};
 	}
 
+	@ApiOperation({
+		summary: "Agent and responder dashboard",
+		description:
+			"Ticket counts and recent tickets for the agent and responder dashboards.",
+	})
+	@ApiResponse({ status: 200, description: "Dashboard fetched" })
+	@Roles(
+		Role.SUPER_ADMIN,
+		Role.ADMIN,
+		Role.AGENT,
+		Role.AGENT_ADMIN,
+		Role.RESPONDER_ADMIN,
+		Role.RESPONDER_TIER_1,
+		Role.RESPONDER_TIER_2,
+	)
+	@UseGuards(RoleGuard)
+	@Get("dashboard")
+	async getDashboard(@Query() query: PaginationQuery) {
+		const data = await this.ticketsService.getDashboard(query);
+		return {
+			message: "Dashboard fetched successfully",
+			...data,
+		};
+	}
+
 	@ApiOperation({ summary: "Get a ticket by id" })
 	@ApiResponse({ status: 200, description: "Ticket fetched successfully" })
 	@Get(":ticketId")

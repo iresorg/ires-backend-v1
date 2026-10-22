@@ -140,6 +140,52 @@ export class TicketsRepository {
 		};
 	}
 
+	async getDashboard(page: number, limit: number) {
+		const counts = await this.repo
+			.createQueryBuilder("ticket")
+			.select("ticket.status", "status")
+			.addSelect("COUNT(*)", "count")
+			.groupBy("ticket.status")
+			.getRawMany<{ status: TicketStatus; count: string }>();
+
+		const byStatus = new Map(
+			counts.map((row) => [row.status, Number(row.count)]),
+		);
+		const ticketsSubmitted = [...byStatus.values()].reduce(
+			(sum, count) => sum + count,
+			0,
+		);
+
+		const offset = (page - 1) * limit;
+		const [recent, total] = await this.repo.findAndCount({
+			select: {
+				ticketId: true,
+				title: true,
+				status: true,
+				updatedAt: true,
+			},
+			order: { updatedAt: "DESC" },
+			skip: offset,
+			take: limit,
+		});
+
+		return {
+			summary: {
+				ticketsSubmitted,
+				ticketsResolved: byStatus.get(TicketStatus.RESOLVED) ?? 0,
+				inProgress: byStatus.get(TicketStatus.IN_PROGRESS) ?? 0,
+				escalated: byStatus.get(TicketStatus.ESCALATED) ?? 0,
+			},
+			data: recent.map((ticket) => ({
+				ticketId: ticket.ticketId,
+				title: ticket.title,
+				status: ticket.status,
+				updatedAt: ticket.updatedAt,
+			})),
+			pagination: getPaginationMeta(total, page, limit),
+		};
+	}
+
 	async countTicketsForAccountInPeriod(
 		accountId: string,
 		periodStart: Date,
