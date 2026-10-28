@@ -1,4 +1,12 @@
-import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import { randomBytes } from "crypto";
+import {
+	Injectable,
+	UnauthorizedException,
+	BadRequestException,
+	InternalServerErrorException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import { UsersService } from "../users/users.service";
 import { Utils } from "@/utils/utils";
 import type { LoginDto, LoginResponseDto } from "./dto/login";
@@ -9,6 +17,13 @@ import {
 	UserNotFoundError,
 } from "@/shared/errors/user.errors";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { UserPasswordReset } from "./entities/user-password-reset.entity";
+import { User } from "../users/entities/user.entity";
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const DEACTIVATED_MESSAGE = "User deactivated. Please contact admin.";
 
 @Injectable()
 export class AuthService {
@@ -16,6 +31,8 @@ export class AuthService {
 		private readonly usersService: UsersService,
 		private readonly utils: Utils,
 		private readonly emailService: EmailService,
+		@InjectRepository(UserPasswordReset)
+		private readonly passwordResets: Repository<UserPasswordReset>,
 	) {}
 
 	async login(body: LoginDto): Promise<LoginResponseDto> {
@@ -114,5 +131,103 @@ export class AuthService {
 
 	async logout(userId: string) {
 		await this.usersService.incrementTokenVersion(userId);
+	}
+
+	async forgotPassword(dto: ForgotPasswordDto) {
+		const user = await this.usersService.findByEmailInsensitive(dto.email);
+		if (!user) {
+			return {
+				message:
+					"If the email exists, a password reset link has been sent",
+			};
+		}
+
+		if (user.status !== "active") {
+			throw new UnauthorizedException(DEACTIVATED_MESSAGE);
+		}
+
+		const token = randomBytes(32).toString("hex");
+		const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+		await this.passwordResets.update(
+			{ email: user.email, used: false },
+			{ used: true },
+		);
+		await this.passwordResets.save(
+			this.passwordResets.create({
+				user: { id: user.id } as User,
+				email: user.email,
+				token,
+				expiresAt,
+				used: false,
+			}),
+		);
+
+		const base = (
+			process.env.FRONTEND_URL ||
+			process.env.PUBLIC_FRONTEND_URL ||
+			""
+		).replace(/\/$/, "");
+		if (!base) {
+			throw new InternalServerErrorException(
+				"Could not send the password reset email.",
+			);
+		}
+		const resetUrl = `${base}/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+
+		try {
+			await this.emailService.sendStaffPasswordResetEmail({
+				email: user.email,
+				resetToken: token,
+				resetUrl,
+			});
+		} catch {
+			throw new InternalServerErrorException(
+				"Could not send the password reset email.",
+			);
+		}
+
+		return {
+			message: "If the email exists, a password reset link has been sent",
+		};
+	}
+
+	async resetPassword(dto: ResetPasswordDto) {
+		const record = await this.passwordResets.findOne({
+			where: { token: dto.token, used: false },
+		});
+		const emailMatches =
+			record?.email.toLowerCase() === dto.email.trim().toLowerCase();
+		if (!record || !emailMatches || record.expiresAt < new Date()) {
+			throw new BadRequestException("Invalid or expired reset token");
+		}
+
+		const user = await this.usersService.findByEmailInsensitive(
+			record.email,
+		);
+		if (!user) {
+			throw new BadRequestException("Invalid or expired reset token");
+		}
+		if (user.status !== "active") {
+			throw new UnauthorizedException(DEACTIVATED_MESSAGE);
+		}
+
+		const samePassword = await this.utils.ensureHashMatchesText(
+			user.password,
+			dto.newPassword,
+		);
+		if (samePassword) {
+			throw new BadRequestException(
+				"New password cannot be the same as the old password",
+			);
+		}
+
+		const passwordHash = await this.utils.createHash(dto.newPassword);
+		await this.usersService.update(user.id, { password: passwordHash });
+		await this.usersService.setMustChangePassword(user.id, false);
+		await this.usersService.incrementTokenVersion(user.id);
+		await this.passwordResets.update({ id: record.id }, { used: true });
+
+		return { message: "Password has been reset successfully" };
 	}
 }

@@ -1,13 +1,20 @@
 import * as React from "react";
-import { Section, Row, Heading, Img } from "@react-email/components";
+import { Section, Row, Column, Heading, Img } from "@react-email/components";
 
 interface Params {
   headerText: string;
 }
 
-const headerStyle = {
-  background:
-    "no-repeat center/100% url(https://res.cloudinary.com/dplxh8dad/image/upload/v1710023068/hirefoster-v2/assets/hf_email_header_1_blncmh.png)",
+const LOGO_SRC =
+  "https://res.cloudinary.com/dlfiul9k2/image/upload/f_png,w_480/v1792679383/ires-logo_ohffrt.svg";
+
+const bannerStyle = {
+  backgroundColor: "#1B2268",
+  backgroundImage:
+    "url(https://res.cloudinary.com/dplxh8dad/image/upload/v1710023068/hirefoster-v2/assets/hf_email_header_1_blncmh.png)",
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "center",
+  backgroundSize: "cover",
 };
 
 export default function (params: Params) {
@@ -15,21 +22,47 @@ export default function (params: Params) {
 
   return (
     <>
-      <Section className="pt-10 pb-12 bg-[#F7F8FD]">
-        <Img
-          className="h-12 mx-auto"
-          src="https://res.cloudinary.com/dlfiul9k2/image/upload/f_png/v1792679383/ires-logo_ohffrt.svg"
-        />
+      <Section
+        style={{ backgroundColor: "#1B2268" }}
+        className="bg-[#1B2268]"
+      >
+        <Row>
+          <Column align="center" style={{ padding: "28px 24px 22px" }}>
+            <Img
+              src={LOGO_SRC}
+              width="156"
+              height="111"
+              alt="iRES"
+              style={{
+                display: "block",
+                margin: "0 auto",
+                width: "156px",
+                height: "auto",
+                border: "0",
+                outline: "none",
+              }}
+            />
+          </Column>
+        </Row>
       </Section>
 
-      <Section style={headerStyle} className="bg-[#1B2268] px-8 py-8">
+      <Section style={bannerStyle} className="bg-[#1B2268] px-8 py-8">
         <Row>
-          <Heading
-            as="h1"
-            className="font-semibold xs:text-xl sm:text-3xl text-white"
-          >
-            {headerText || "Lorem Ipsum Sit Dolor Amet"}
-          </Heading>
+          <Column>
+            <Heading
+              as="h1"
+              className="font-semibold text-white"
+              style={{
+                color: "#ffffff",
+                fontSize: "28px",
+                lineHeight: "36px",
+                fontWeight: 600,
+                margin: "0",
+              }}
+            >
+              {headerText || "iRES"}
+            </Heading>
+          </Column>
         </Row>
       </Section>
     </>
