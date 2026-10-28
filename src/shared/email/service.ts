@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { render } from "@react-email/render";
 import { EmailConsumer } from "../queue/consumers/email.consumer";
+import PasswordReset from "./templates/PasswordReset";
 import { EmailPayload } from "./types";
 import { Role } from "@/modules/users/enums/role.enum";
 import { TicketEscalateParams } from "./templates/TicketEscalated";
@@ -102,6 +104,26 @@ export class EmailService {
 			options: { headerText: "Verify your email", otp },
 		};
 		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendStaffPasswordResetEmail(params: {
+		email: string;
+		resetToken: string;
+		resetUrl: string;
+	}): Promise<void> {
+		const html = await render(
+			PasswordReset({
+				headerText: "Reset your password",
+				resetToken: params.resetToken,
+				email: params.email,
+				resetUrl: params.resetUrl,
+			}),
+		);
+		await this.sendHtmlEmail({
+			to: params.email,
+			subject: "Reset your password",
+			html,
+		});
 	}
 
 	async sendPasswordResetEmail(email: string, resetToken: string) {

@@ -115,6 +115,10 @@ export class UsersService {
 		await this.usersRepository.setMustChangePassword(id, value);
 	}
 
+	async findByEmailInsensitive(email: string): Promise<IUser | null> {
+		return this.usersRepository.findByEmailInsensitive(email);
+	}
+
 	async findOne(filter: {
 		id?: string;
 		email?: string;

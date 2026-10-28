@@ -12,6 +12,8 @@ import { LoginDto } from "./dto/login";
 import { AuthGuard } from "@/shared/guards/auth.guard";
 import { Public } from "@/shared/decorators/public.decorator";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
@@ -36,6 +38,44 @@ export class AuthController {
 			message: "Login successful",
 			data,
 		};
+	}
+
+	@Public()
+	@HttpCode(HttpStatus.OK)
+	@Post("forgot-password")
+	@ApiOperation({
+		summary: "Request a staff password reset",
+		description:
+			"Sends a reset link to an active admin, agent, or responder. Deactivated users are rejected. Unknown emails get the same success message as a real account.",
+	})
+	@ApiResponse({ status: 200, description: "Reset email accepted" })
+	@ApiResponse({
+		status: 401,
+		description: "User deactivated. Please contact admin.",
+	})
+	async forgotPassword(@Body() body: ForgotPasswordDto) {
+		return await this.authService.forgotPassword(body);
+	}
+
+	@Public()
+	@HttpCode(HttpStatus.OK)
+	@Post("reset-password")
+	@ApiOperation({
+		summary: "Reset a staff password",
+		description:
+			"Sets a new password using the token from the reset email. The token expires in 1 hour. Deactivated users cannot reset. Existing sessions are signed out.",
+	})
+	@ApiResponse({ status: 200, description: "Password reset successfully" })
+	@ApiResponse({
+		status: 400,
+		description: "Invalid or expired reset token",
+	})
+	@ApiResponse({
+		status: 401,
+		description: "User deactivated. Please contact admin.",
+	})
+	async resetPassword(@Body() body: ResetPasswordDto) {
+		return await this.authService.resetPassword(body);
 	}
 
 	@HttpCode(HttpStatus.OK)

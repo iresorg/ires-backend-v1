@@ -20,6 +20,17 @@ export class UserRepository implements IUserRepository {
 		return user ? this.mapToIUser(user) : null;
 	}
 
+	async findByEmailInsensitive(email: string): Promise<IUser | null> {
+		const user = await this.userRepo
+			.createQueryBuilder("user")
+			.where("LOWER(user.email) = LOWER(:email)", {
+				email: email.trim(),
+			})
+			.getOne();
+
+		return user ? this.mapToIUser(user) : null;
+	}
+
 	async findById(id: string): Promise<IUser | null> {
 		const user = await this.userRepo.findOne({ where: { id } });
 		return user ? this.mapToIUser(user) : null;
