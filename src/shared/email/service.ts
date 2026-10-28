@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { render } from "@react-email/render";
 import { EmailConsumer } from "../queue/consumers/email.consumer";
 import PasswordReset from "./templates/PasswordReset";
+import AdminPasswordReset from "./templates/AdminPasswordReset";
 import { EmailPayload } from "./types";
 import { Role } from "@/modules/users/enums/role.enum";
 import { TicketEscalateParams } from "./templates/TicketEscalated";
@@ -104,6 +105,25 @@ export class EmailService {
 			options: { headerText: "Verify your email", otp },
 		};
 		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendAdminPasswordResetEmail(params: {
+		email: string;
+		userName: string;
+		password: string;
+	}): Promise<void> {
+		const html = await render(
+			AdminPasswordReset({
+				headerText: "Your password was reset",
+				userName: params.userName,
+				password: params.password,
+			}),
+		);
+		await this.sendHtmlEmail({
+			to: params.email,
+			subject: "Your iRES password was reset",
+			html,
+		});
 	}
 
 	async sendStaffPasswordResetEmail(params: {

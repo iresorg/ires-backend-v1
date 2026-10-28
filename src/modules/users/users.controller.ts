@@ -524,4 +524,76 @@ export class UsersController {
 			data: UserResponseDto.fromUser(data),
 		};
 	}
+
+	@Post(":userId/reset-password")
+	@Roles(
+		Role.SUPER_ADMIN,
+		Role.ADMIN,
+		Role.AGENT_ADMIN,
+		Role.RESPONDER_ADMIN,
+	)
+	@ApiParam({
+		name: "userId",
+		description: "The ID of the user whose password will be reset",
+	})
+	@ApiOperation({
+		summary: "Reset a user's password and email the new one",
+		description:
+			"Super admin can reset any staff user. Admin can reset any user except a super admin. Agent admin can reset agents. Responder admin can reset responders. The temporary password is emailed to the user and is not returned.",
+	})
+	@ApiResponse({
+		status: 201,
+		description: "A new password has been sent to the user's email",
+	})
+	async resetUserPassword(
+		@Param("userId") userId: string,
+		@Req() req: AuthRequest,
+	): Promise<{ message: string; data: UserResponseDto }> {
+		const { id: resetBy, role: resetByRole } = req.user;
+		const existingUser = await this.usersService.findOne({ id: userId });
+
+		if (!existingUser) {
+			throw new NotFoundException("User not found");
+		}
+
+		if (
+			resetByRole === Role.ADMIN &&
+			existingUser.role === Role.SUPER_ADMIN
+		) {
+			throw new ForbiddenException(
+				"Admin cannot reset a super admin password",
+			);
+		}
+
+		if (
+			resetByRole === Role.AGENT_ADMIN &&
+			existingUser.role !== Role.AGENT
+		) {
+			throw new ForbiddenException(
+				"Agent admin can only reset passwords for agents",
+			);
+		}
+
+		if (
+			resetByRole === Role.RESPONDER_ADMIN &&
+			![Role.RESPONDER_TIER_1, Role.RESPONDER_TIER_2].includes(
+				existingUser.role,
+			)
+		) {
+			throw new ForbiddenException(
+				"Responder admin can only reset passwords for responders",
+			);
+		}
+
+		const data = await this.usersService.resetPasswordForUser(
+			userId,
+			resetBy,
+			resetByRole,
+		);
+
+		return {
+			message: "A new password has been sent to the user's email",
+			data: UserResponseDto.fromUser(data),
+		};
+	}
 }

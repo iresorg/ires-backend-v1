@@ -1,6 +1,7 @@
 import {
 	ConflictException,
 	Injectable,
+	InternalServerErrorException,
 	NotFoundException,
 	ForbiddenException,
 } from "@nestjs/common";
@@ -270,5 +271,48 @@ export class UsersService {
 		);
 
 		return user;
+	}
+
+	async resetPasswordForUser(
+		userId: string,
+		resetBy: string,
+		resetByRole: Role,
+	): Promise<IUser> {
+		const user = await this.usersRepository.findById(userId);
+		if (!user) throw new UserNotFoundError();
+
+		const password = this.utils.generatePassword(8);
+		const updated = await this.usersRepository.update(userId, {
+			password: await this.utils.createHash(password),
+		});
+		await this.setMustChangePassword(userId, true);
+		await this.incrementTokenVersion(userId);
+
+		try {
+			await this.emailService.sendAdminPasswordResetEmail({
+				email: user.email,
+				userName: `${user.firstName} ${user.lastName}`.trim(),
+				password,
+			});
+		} catch {
+			throw new InternalServerErrorException(
+				"Could not send the new password email.",
+			);
+		}
+
+		this.logger.log(
+			`Password reset for ${user.email} by ${resetBy} with role ${resetByRole}`,
+			{
+				resetUserId: userId,
+				resetByUserId: resetBy,
+				resetByRole,
+				timestamp: new Date().toISOString(),
+			},
+		);
+
+		return {
+			...updated,
+			mustChangePassword: true,
+		};
 	}
 }
