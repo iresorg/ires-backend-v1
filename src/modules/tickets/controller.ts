@@ -167,6 +167,28 @@ export class TicketsController {
 		};
 	}
 
+	@ApiOperation({
+		summary: "Ticket queue",
+		description:
+			"Tickets in CREATED or PENDING that do not have a responder yet.",
+	})
+	@ApiResponse({ status: 200, description: "Ticket queue fetched" })
+	@Roles(
+		Role.SUPER_ADMIN,
+		Role.ADMIN,
+		Role.AGENT_ADMIN,
+		Role.RESPONDER_ADMIN,
+	)
+	@UseGuards(RoleGuard)
+	@Get("queue")
+	async getQueue(@Query() query: PaginationQuery) {
+		const data = await this.ticketsService.getQueue(query);
+		return {
+			message: "Ticket queue fetched",
+			...data,
+		};
+	}
+
 	@ApiOperation({ summary: "Get a ticket by id" })
 	@ApiResponse({ status: 200, description: "Ticket fetched successfully" })
 	@Get(":ticketId")

@@ -50,12 +50,12 @@ export class CreateIncidentReportDto {
 	@MaxLength(120)
 	name: string;
 
-	@ApiProperty({ example: "Northwind Ltd" })
+	@ApiPropertyOptional({ example: "Northwind Ltd" })
+	@IsOptional()
 	@Transform(trimString)
 	@IsString()
-	@IsNotEmpty()
 	@MaxLength(200)
-	organization: string;
+	organization?: string;
 
 	@ApiProperty({ example: "08031234567" })
 	@Transform(trimString)

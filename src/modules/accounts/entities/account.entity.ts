@@ -32,6 +32,10 @@ export class Account extends BaseEntity {
 	@Column({ type: "int", name: "token_version", default: 0 })
 	tokenVersion: number;
 
+	/** True when the account still has a temporary password and must replace it. */
+	@Column({ type: "boolean", name: "must_change_password", default: false })
+	mustChangePassword: boolean;
+
 	@OneToOne(() => IndividualProfile, (p) => p.account)
 	individualProfile?: IndividualProfile;
 

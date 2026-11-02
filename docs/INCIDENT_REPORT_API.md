@@ -36,7 +36,7 @@ Content-Type: application/json
 | `incidentType` | string | Yes | Free text. Not an enum |
 | `ongoing` | string | Yes | `Yes` \| `No` \| `Not sure` |
 | `name` | string | Yes | Reporter name |
-| `organization` | string | Yes | Organization |
+| `organization` | string | No | Organization. Omit it or send an empty string when the reporter has none |
 | `phone` | string | Yes | Number the handler should call |
 | `email` | string | Yes | Reporter email. Use as `Reply-To` |
 | `detectedAt` | string | No | `datetime-local` value from the browser, for example `2026-10-21T14:30` |
@@ -102,9 +102,12 @@ A second email, also from the iRES template, is sent to the reporter address: su
 ```json
 {
   "message": "Incident report received",
-  "incidentReference": "IR-20261022-A1B2C3"
+  "incidentReference": "IR-20261022-A1B2C3",
+  "accountCreated": false
 }
 ```
+
+`accountCreated` is `true` when this request created a portal account for the email. The password is emailed, not returned. Stored incidents, queues, and the customer Incidents tab are in [INCIDENTS_AND_TICKETS.md](./INCIDENTS_AND_TICKETS.md).
 
 ### Errors
 

@@ -201,6 +201,22 @@ export class TicketsRepository {
 			.getCount();
 	}
 
+	async countByStatusForAccount(
+		accountId: string,
+	): Promise<{ status: string; count: number }[]> {
+		const rows = await this.getRepo()
+			.createQueryBuilder("ticket")
+			.select("ticket.status", "status")
+			.addSelect("COUNT(*)", "count")
+			.where("ticket.created_for_account_id = :accountId", { accountId })
+			.groupBy("ticket.status")
+			.getRawMany<{ status: string; count: string }>();
+		return rows.map((row) => ({
+			status: row.status,
+			count: Number(row.count),
+		}));
+	}
+
 	async countTicketsForAccount(
 		accountId: string,
 		trx?: TDatabaseTransaction,
@@ -311,5 +327,22 @@ export class TicketsRepository {
 				createdAt: ticket.subCategory?.createdAt,
 			},
 		};
+	}
+
+	async getUnassignedQueue(page: number, limit: number) {
+		const [rows, total] = await this.repo
+			.createQueryBuilder("ticket")
+			.leftJoinAndSelect("ticket.createdFor", "account")
+			.leftJoinAndSelect("account.individualProfile", "individual")
+			.leftJoinAndSelect("account.organizationProfile", "organization")
+			.where("ticket.status IN (:...statuses)", {
+				statuses: [TicketStatus.CREATED, TicketStatus.PENDING],
+			})
+			.andWhere("ticket.assigned_responder_id IS NULL")
+			.orderBy("ticket.createdAt", "DESC")
+			.skip((page - 1) * limit)
+			.take(limit)
+			.getManyAndCount();
+		return { rows, total };
 	}
 }
