@@ -201,6 +201,22 @@ export class TicketsRepository {
 			.getCount();
 	}
 
+	async countByStatusForAccount(
+		accountId: string,
+	): Promise<{ status: string; count: number }[]> {
+		const rows = await this.getRepo()
+			.createQueryBuilder("ticket")
+			.select("ticket.status", "status")
+			.addSelect("COUNT(*)", "count")
+			.where("ticket.created_for_account_id = :accountId", { accountId })
+			.groupBy("ticket.status")
+			.getRawMany<{ status: string; count: string }>();
+		return rows.map((row) => ({
+			status: row.status,
+			count: Number(row.count),
+		}));
+	}
+
 	async countTicketsForAccount(
 		accountId: string,
 		trx?: TDatabaseTransaction,

@@ -93,4 +93,21 @@ export class IncidentReportsRepository {
 	async closeByTicketId(ticketId: string): Promise<void> {
 		await this.incidents.update({ ticketId }, { status: "CLOSED" });
 	}
+
+	async countByStatusForAccount(
+		accountId: string,
+	): Promise<{ status: IncidentStatus; count: number }[]> {
+		const rows = await this.incidents
+			.createQueryBuilder("incident")
+			.innerJoin("incident.account", "account")
+			.select("incident.status", "status")
+			.addSelect("COUNT(*)", "count")
+			.where("account.id = :accountId", { accountId })
+			.groupBy("incident.status")
+			.getRawMany<{ status: IncidentStatus; count: string }>();
+		return rows.map((row) => ({
+			status: row.status,
+			count: Number(row.count),
+		}));
+	}
 }

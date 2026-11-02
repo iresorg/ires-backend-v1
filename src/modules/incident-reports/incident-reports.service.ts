@@ -89,6 +89,13 @@ export class IncidentReportsService {
 		};
 	}
 
+	async countsForAccount(accountId: string) {
+		const rows = await this.repo.countByStatusForAccount(accountId);
+		const open = rows.find((row) => row.status === "OPEN")?.count ?? 0;
+		const closed = rows.find((row) => row.status === "CLOSED")?.count ?? 0;
+		return { total: open + closed, open, closed };
+	}
+
 	async listForAccount(accountId: string, page = 1, limit = 10, status?: "OPEN" | "CLOSED") {
 		const { rows, total } = await this.repo.search({
 			accountId,

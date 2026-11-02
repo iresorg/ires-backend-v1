@@ -41,6 +41,14 @@ Wrong ticket → `403 Forbidden` (`You do not have access to this ticket`).
 
 ---
 
+## Overview
+
+```http
+GET /api/v1/accounts/overview
+```
+
+Account token. Counts for this account only: incidents (`total`, `open`, `closed`), tickets (`total`, `open`, `resolved`, `closed`, `byStatus`), and coverage (`eligible`, `source`, `planName`, `maxIncidents`, `usedIncidents`, `remainingIncidents`, `paygCreditsAvailable`). `tickets.open` excludes `RESOLVED` and `CLOSED`.
+
 ## List my tickets
 
 **Paginated** — same shape as admin `GET /tickets`. Pass `page` / `limit` and use `pagination` for the UI.

@@ -415,6 +415,49 @@ export class TicketsService {
 		return ticket;
 	}
 
+	async getAccountOverview(accountId: string) {
+		const [incidentCounts, ticketRows, eligibility] = await Promise.all([
+			this.incidentReports.countsForAccount(accountId),
+			this.ticketsRepository.countByStatusForAccount(accountId),
+			this.getAccountEligibility(accountId),
+		]);
+		const byStatus = Object.values(TicketStatus).reduce(
+			(counts, status) => {
+				counts[status] = 0;
+				return counts;
+			},
+			{} as Record<TicketStatus, number>,
+		);
+		for (const row of ticketRows) {
+			if (row.status in byStatus) {
+				byStatus[row.status as TicketStatus] = row.count;
+			}
+		}
+		const total = Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+		const resolved = byStatus.RESOLVED;
+		const closed = byStatus.CLOSED;
+		return {
+			incidents: incidentCounts,
+			tickets: {
+				total,
+				open: total - resolved - closed,
+				resolved,
+				closed,
+				byStatus,
+			},
+			coverage: {
+				eligible: eligibility.eligible,
+				source: eligibility.source,
+				planName: eligibility.subscription?.planName ?? null,
+				maxIncidents: eligibility.subscription?.maxIncidents ?? null,
+				usedIncidents: eligibility.subscription?.usedIncidents ?? 0,
+				remainingIncidents:
+					eligibility.subscription?.remainingIncidents ?? null,
+				paygCreditsAvailable: eligibility.paygCreditsAvailable,
+			},
+		};
+	}
+
 	async getAccountTickets(
 		accountId: string,
 		query: Partial<PaginationQuery & { status: TicketStatus }>,

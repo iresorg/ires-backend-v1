@@ -5,6 +5,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Tickets } from "./entities/ticket.entity";
 import { TicketsController } from "./controller";
 import { AccountTicketsController } from "./account-tickets.controller";
+import { AccountOverviewController } from "./account-overview.controller";
 import { TicketLifecycle } from "./entities/ticket-lifecycle.entity";
 import { UsersModule } from "@/modules/users/users.module";
 import { EmailModule } from "@/shared/email/module";
@@ -35,7 +36,11 @@ import { IncidentReportsModule } from "@/modules/incident-reports/incident-repor
 		TicketLifecycleRepository,
 		AccountsAuthGuard,
 	],
-	controllers: [TicketsController, AccountTicketsController],
+	controllers: [
+		TicketsController,
+		AccountTicketsController,
+		AccountOverviewController,
+	],
 	exports: [TicketsService],
 })
 export class TicketsModule {}
