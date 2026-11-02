@@ -16,7 +16,7 @@ export default function IncidentAssigned(params: {
 	reference: string;
 	severity: string;
 	incidentType: string;
-	organization: string;
+	organization?: string;
 	customerEmail: string;
 	headerText?: string;
 }) {
@@ -52,8 +52,12 @@ export default function IncidentAssigned(params: {
 								<br />
 								Type: {incidentType}
 								<br />
-								Organization: {organization}
-								<br />
+								{organization ? (
+									<>
+										Organization: {organization}
+										<br />
+									</>
+								) : null}
 								Customer email: {customerEmail}
 							</Text>
 						</Section>

@@ -68,7 +68,7 @@ export class StartupSeederService implements OnModuleInit {
 				"incident_type" character varying NOT NULL,
 				"ongoing" character varying NOT NULL,
 				"name" character varying NOT NULL,
-				"organization" character varying NOT NULL,
+				"organization" character varying,
 				"phone" character varying NOT NULL,
 				"email" character varying NOT NULL,
 				"detected_at" character varying,
@@ -88,6 +88,10 @@ export class StartupSeederService implements OnModuleInit {
 		await this.dataSource.query(`
 			CREATE INDEX IF NOT EXISTS "IDX_incident_reports_ticket"
 			ON "incident_reports" ("ticket_id")
+		`);
+		await this.dataSource.query(`
+			ALTER TABLE "incident_reports"
+			ALTER COLUMN "organization" DROP NOT NULL
 		`);
 	}
 

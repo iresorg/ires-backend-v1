@@ -36,7 +36,7 @@ Content-Type: application/json
 | `incidentType` | string | Yes | Free text. Not an enum |
 | `ongoing` | string | Yes | `Yes` \| `No` \| `Not sure` |
 | `name` | string | Yes | Reporter name |
-| `organization` | string | Yes | Organization |
+| `organization` | string | No | Organization. Omit it or send an empty string when the reporter has none |
 | `phone` | string | Yes | Number the handler should call |
 | `email` | string | Yes | Reporter email. Use as `Reply-To` |
 | `detectedAt` | string | No | `datetime-local` value from the browser, for example `2026-10-21T14:30` |

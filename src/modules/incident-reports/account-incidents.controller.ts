@@ -4,13 +4,15 @@ import {
 	Get,
 	Param,
 	Patch,
+	Post,
 	Query,
 	Req,
 	UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AccountsAuthGuard } from "@/shared/guards/accounts-auth.guard";
 import { IncidentReportsService } from "./incident-reports.service";
+import { CreateAccountIncidentDto } from "./dto/create-account-incident.dto";
 import { IncidentQueueQuery } from "./dto/incident-queue-query.dto";
 import { UpdateCustomerIncidentDto } from "./dto/update-incident-report.dto";
 
@@ -19,6 +21,20 @@ import { UpdateCustomerIncidentDto } from "./dto/update-incident-report.dto";
 @Controller("accounts/incidents")
 export class AccountIncidentsController {
 	constructor(private readonly incidents: IncidentReportsService) {}
+
+	@Post()
+	@ApiOperation({
+		summary: "Create an incident for the signed-in account",
+		description:
+			"Uses the account email. Support receives the incident. The customer receives a notice that the incident was created, with no password and no sign-in link.",
+	})
+	@ApiBody({ type: CreateAccountIncidentDto })
+	async create(
+		@Req() req: { user: { id: string } },
+		@Body() body: CreateAccountIncidentDto,
+	) {
+		return await this.incidents.submitForAccount(req.user.id, body);
+	}
 
 	@Get()
 	@ApiOperation({ summary: "List incidents for the signed-in account" })

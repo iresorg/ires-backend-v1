@@ -16,7 +16,7 @@ export type IncidentReportConfirmationParams = {
 	headerText?: string;
 	firstName: string;
 	reference: string;
-	organization: string;
+	organization?: string;
 	incidentType: string;
 	severity: string;
 	ongoing: string;
@@ -24,7 +24,8 @@ export type IncidentReportConfirmationParams = {
 	website?: string;
 };
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value }: { label: string; value?: string }) {
+	if (!value) return null;
 	return (
 		<Text className="text-base my-1">
 			<span className="text-[#667085]">{label}</span>

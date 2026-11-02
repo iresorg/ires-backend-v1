@@ -18,7 +18,7 @@ export type IncidentReportEmailParams = {
 	incidentType: string;
 	ongoing: string;
 	name: string;
-	organization: string;
+	organization?: string;
 	phone: string;
 	email: string;
 	detectedAt?: string;

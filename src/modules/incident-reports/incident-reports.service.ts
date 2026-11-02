@@ -9,21 +9,25 @@ import {
 	InternalServerErrorException,
 	Logger,
 	NotFoundException,
+	UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { render } from "@react-email/render";
 import { EmailService } from "@/shared/email/service";
 import { EnvVariables } from "@/utils/env.validate";
 import { AccountsService } from "@/modules/accounts/services/accounts.service";
+import { AccountsRepository } from "@/modules/accounts/repository/accounts.repository";
 import { UsersService } from "@/modules/users/users.service";
 import { Role } from "@/modules/users/enums/role.enum";
 import { User } from "@/modules/users/entities/user.entity";
 import { Account } from "@/modules/accounts/entities/account.entity";
 import { TicketStatus } from "@/modules/tickets/interfaces/ticket.interface";
 import { buildPaginationResult } from "@/shared/utils/pagination.util";
+import IncidentCreated from "@/shared/email/templates/IncidentCreated";
 import IncidentReportConfirmation from "@/shared/email/templates/IncidentReportConfirmation";
 import IncidentReportToSupport from "@/shared/email/templates/IncidentReportToSupport";
 import { CreateIncidentReportDto } from "./dto/create-incident-report.dto";
+import { CreateAccountIncidentDto } from "./dto/create-account-incident.dto";
 import { UpdateCustomerIncidentDto } from "./dto/update-incident-report.dto";
 import { IncidentReportsRepository } from "./incident-reports.repository";
 import { IncidentReport } from "./entities/incident-report.entity";
@@ -41,17 +45,48 @@ export class IncidentReportsService {
 		private readonly emailService: EmailService,
 		private readonly config: ConfigService<EnvVariables>,
 		private readonly accountsService: AccountsService,
+		private readonly accountsRepo: AccountsRepository,
 		private readonly usersService: UsersService,
 		private readonly repo: IncidentReportsRepository,
 	) {}
 
 	async submit(dto: CreateIncidentReportDto, ip: string) {
 		this.assertWithinLimit(ip);
-		return this.createIncident(dto, null);
+		const { incident, created } = await this.createIncident(dto, null);
+		return {
+			message: "Incident report received",
+			incidentReference: incident.reference,
+			accountCreated: created,
+		};
 	}
 
 	async submitForStaff(dto: CreateIncidentReportDto, staffId: string) {
-		return this.createIncident(dto, staffId);
+		const { incident, created } = await this.createIncident(dto, staffId);
+		return {
+			message: "Incident report received",
+			incidentReference: incident.reference,
+			accountCreated: created,
+		};
+	}
+
+	async submitForAccount(accountId: string, dto: CreateAccountIncidentDto) {
+		const account = await this.accountsRepo.findById(accountId);
+		if (!account) throw new UnauthorizedException("Account not found");
+		const { incident } = await this.createIncident(
+			{
+				...dto,
+				email: account.email,
+				confirmed: true,
+			},
+			null,
+			account,
+		);
+		return {
+			message: "Incident report received",
+			incidentReference: incident.reference,
+			accountCreated: false,
+			incident: await this.oneView(incident, false),
+		};
 	}
 
 	async listForAccount(accountId: string, page = 1, limit = 10, status?: "OPEN" | "CLOSED") {
@@ -151,7 +186,7 @@ export class IncidentReportsService {
 				reference: incident.reference,
 				severity: incident.severity,
 				incidentType: incident.incidentType,
-				organization: incident.organization,
+				organization: incident.organization ?? undefined,
 				customerEmail: incident.email,
 			});
 		} catch {
@@ -188,18 +223,20 @@ export class IncidentReportsService {
 	private async createIncident(
 		dto: CreateIncidentReportDto,
 		staffId: string | null,
+		knownAccount?: Account,
 	) {
 		const to = this.config.get("SUPPORT_EMAIL");
 		if (!to) {
 			throw new InternalServerErrorException("Could not send the report.");
 		}
 
-		const { account, created } =
-			await this.accountsService.provisionIndividualForIncident({
-				email: dto.email,
-				name: dto.name,
-				phone: dto.phone,
-			});
+		const { account, created } = knownAccount
+			? { account: knownAccount, created: false }
+			: await this.accountsService.provisionIndividualForIncident({
+					email: dto.email,
+					name: dto.name,
+					phone: dto.phone,
+				});
 
 		const reportedAt = new Date();
 		const reference = createIncidentReference(reportedAt);
@@ -211,7 +248,7 @@ export class IncidentReportsService {
 			incidentType: dto.incidentType,
 			ongoing: dto.ongoing,
 			name: dto.name,
-			organization: dto.organization,
+			organization: dto.organization ?? null,
 			phone: dto.phone,
 			email: dto.email.trim(),
 			detectedAt: dto.detectedAt ?? null,
@@ -250,21 +287,33 @@ export class IncidentReportsService {
 		}
 
 		try {
-			const html = await render(
-				IncidentReportConfirmation({
-					firstName: firstNameFrom(dto.name),
-					reference,
-					organization: dto.organization,
-					incidentType: dto.incidentType,
-					severity: dto.severity,
-					ongoing: dto.ongoing,
-					reportedAt: formatReportedAt(reportedAt),
-					website: "https://iresorg.com",
-				}),
-			);
+			const html = knownAccount
+				? await render(
+						IncidentCreated({
+							firstName: firstNameFrom(dto.name),
+							reference,
+							incidentType: dto.incidentType,
+							severity: dto.severity,
+							organization: dto.organization,
+						}),
+					)
+				: await render(
+						IncidentReportConfirmation({
+							firstName: firstNameFrom(dto.name),
+							reference,
+							organization: dto.organization,
+							incidentType: dto.incidentType,
+							severity: dto.severity,
+							ongoing: dto.ongoing,
+							reportedAt: formatReportedAt(reportedAt),
+							website: "https://iresorg.com",
+						}),
+					);
 			await this.emailService.sendHtmlEmail({
 				to: dto.email,
-				subject: `We received your incident report — ${reference}`,
+				subject: knownAccount
+					? `Incident created — ${reference}`
+					: `We received your incident report — ${reference}`,
 				html,
 			});
 		} catch (error) {
@@ -274,11 +323,7 @@ export class IncidentReportsService {
 			);
 		}
 
-		return {
-			message: "Incident report received",
-			incidentReference: reference,
-			accountCreated: created,
-		};
+		return { incident, created };
 	}
 
 	private async requireIncident(id: string): Promise<IncidentReport> {

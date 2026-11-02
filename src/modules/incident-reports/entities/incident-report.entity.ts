@@ -30,8 +30,8 @@ export class IncidentReport extends BaseEntity {
 	@Column({ type: "varchar" })
 	name: string;
 
-	@Column({ type: "varchar" })
-	organization: string;
+	@Column({ type: "varchar", nullable: true })
+	organization?: string | null;
 
 	@Column({ type: "varchar" })
 	phone: string;

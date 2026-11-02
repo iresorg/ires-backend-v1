@@ -83,7 +83,7 @@ List rows and the detail `incident` object use the same fields.
 | `incidentType` | string | Free text, max 200 |
 | `ongoing` | string | `Yes` \| `No` \| `Not sure` |
 | `name` | string | |
-| `organization` | string | |
+| `organization` | string or null | Optional on create |
 | `phone` | string | |
 | `email` | string | Email on the report |
 | `detectedAt` | string or null | |
@@ -122,7 +122,7 @@ Paginated lists:
 
 `POST /api/v1/incident-reports`
 
-No auth. Body is the public report (`severity`, `incidentType`, `ongoing`, `name`, `organization`, `phone`, `email`, optional `detectedAt` and `affectedSystems`, `description`, `confirmed: true`).
+No auth. Body is the public report (`severity`, `incidentType`, `ongoing`, `name`, `phone`, `email`, optional `organization`, `detectedAt`, and `affectedSystems`, `description`, `confirmed: true`).
 
 `201`
 
@@ -158,6 +158,29 @@ Same body and same `201` as the public form. Same account lookup.
 ## Customer dashboard — Incidents tab
 
 Auth: account token.
+
+### Create
+
+```http
+POST /api/v1/accounts/incidents
+```
+
+Same body as the public form, except `email` is optional and ignored. The incident is saved on the signed-in account, using that account’s email.
+
+No new account is created, and no password email is sent. Support receives the incident email. The signed-in customer receives `Incident created — {reference}`. That email names the reference, severity, and type. It does not include a password or a sign-in link.
+
+`201`
+
+```json
+{
+  "message": "Incident report received",
+  "incidentReference": "IR-20261102-A1B2C3",
+  "accountCreated": false,
+  "incident": {}
+}
+```
+
+`incident` is the object above, without `createdByStaffId`.
 
 ### List
 

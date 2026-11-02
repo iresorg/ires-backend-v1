@@ -136,7 +136,7 @@ export class EmailService {
 		reference: string;
 		severity: string;
 		incidentType: string;
-		organization: string;
+		organization?: string;
 		customerEmail: string;
 	}): Promise<void> {
 		const html = await render(
