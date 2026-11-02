@@ -102,9 +102,12 @@ A second email, also from the iRES template, is sent to the reporter address: su
 ```json
 {
   "message": "Incident report received",
-  "incidentReference": "IR-20261022-A1B2C3"
+  "incidentReference": "IR-20261022-A1B2C3",
+  "accountCreated": false
 }
 ```
+
+`accountCreated` is `true` when this request created a portal account for the email. The password is emailed, not returned. Stored incidents, queues, and the customer Incidents tab are in [INCIDENTS_AND_TICKETS.md](./INCIDENTS_AND_TICKETS.md).
 
 ### Errors
 

@@ -159,6 +159,7 @@ export class AccountsAuthController {
 			type: "object",
 			properties: {
 				token: { type: "string", example: "jwt-token-string" },
+				mustChangePassword: { type: "boolean", example: false },
 			},
 		},
 	})

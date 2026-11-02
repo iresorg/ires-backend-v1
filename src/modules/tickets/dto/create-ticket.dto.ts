@@ -190,4 +190,13 @@ export class CreateTicketDto
 	})
 	@IsUUID()
 	accountId: string;
+
+	@ApiProperty({
+		required: false,
+		description:
+			"Incident to link. Its account must be the same as accountId.",
+	})
+	@IsOptional()
+	@IsString()
+	incidentId?: string;
 }

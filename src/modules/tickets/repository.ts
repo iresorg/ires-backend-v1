@@ -312,4 +312,21 @@ export class TicketsRepository {
 			},
 		};
 	}
+
+	async getUnassignedQueue(page: number, limit: number) {
+		const [rows, total] = await this.repo
+			.createQueryBuilder("ticket")
+			.leftJoinAndSelect("ticket.createdFor", "account")
+			.leftJoinAndSelect("account.individualProfile", "individual")
+			.leftJoinAndSelect("account.organizationProfile", "organization")
+			.where("ticket.status IN (:...statuses)", {
+				statuses: [TicketStatus.CREATED, TicketStatus.PENDING],
+			})
+			.andWhere("ticket.assigned_responder_id IS NULL")
+			.orderBy("ticket.createdAt", "DESC")
+			.skip((page - 1) * limit)
+			.take(limit)
+			.getManyAndCount();
+		return { rows, total };
+	}
 }

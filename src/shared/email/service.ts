@@ -4,6 +4,8 @@ import { render } from "@react-email/render";
 import { EmailConsumer } from "../queue/consumers/email.consumer";
 import PasswordReset from "./templates/PasswordReset";
 import AdminPasswordReset from "./templates/AdminPasswordReset";
+import IncidentAccountReady from "./templates/IncidentAccountReady";
+import IncidentAssigned from "./templates/IncidentAssigned";
 import { EmailPayload } from "./types";
 import { Role } from "@/modules/users/enums/role.enum";
 import { TicketEscalateParams } from "./templates/TicketEscalated";
@@ -105,6 +107,53 @@ export class EmailService {
 			options: { headerText: "Verify your email", otp },
 		};
 		await this.emailConsumer.publishEmailToQueue(payload);
+	}
+
+	async sendIncidentAccountEmail(params: {
+		email: string;
+		name: string;
+		password: string;
+		loginUrl?: string;
+	}): Promise<void> {
+		const html = await render(
+			IncidentAccountReady({
+				name: params.name,
+				email: params.email,
+				password: params.password,
+				loginUrl: params.loginUrl,
+			}),
+		);
+		await this.sendHtmlEmail({
+			to: params.email,
+			subject: "Your iRES account is ready",
+			html,
+		});
+	}
+
+	async sendIncidentAssignedEmail(params: {
+		email: string;
+		agentName: string;
+		reference: string;
+		severity: string;
+		incidentType: string;
+		organization: string;
+		customerEmail: string;
+	}): Promise<void> {
+		const html = await render(
+			IncidentAssigned({
+				agentName: params.agentName,
+				reference: params.reference,
+				severity: params.severity,
+				incidentType: params.incidentType,
+				organization: params.organization,
+				customerEmail: params.customerEmail,
+			}),
+		);
+		await this.sendHtmlEmail({
+			to: params.email,
+			subject: `Incident assigned to you — ${params.reference}`,
+			html,
+		});
 	}
 
 	async sendAdminPasswordResetEmail(params: {

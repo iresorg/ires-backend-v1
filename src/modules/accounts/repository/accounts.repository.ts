@@ -23,7 +23,12 @@ export class AccountsRepository {
 	) {}
 
 	async findByEmail(email: string): Promise<Account | null> {
-		return await this.accounts.findOne({ where: { email } });
+		const trimmed = email.trim();
+		const rows = await this.accounts
+			.createQueryBuilder("account")
+			.where("LOWER(account.email) = LOWER(:email)", { email: trimmed })
+			.getMany();
+		return rows.find((row) => row.email === trimmed) ?? rows[0] ?? null;
 	}
 
 	async findById(id: string): Promise<Account | null> {
@@ -40,6 +45,10 @@ export class AccountsRepository {
 
 	async updateLastLogin(id: string, when: Date): Promise<void> {
 		await this.accounts.update({ id }, { lastLogin: when });
+	}
+
+	async setMustChangePassword(id: string, value: boolean): Promise<void> {
+		await this.accounts.update({ id }, { mustChangePassword: value });
 	}
 
 	async createIndividualProfile(

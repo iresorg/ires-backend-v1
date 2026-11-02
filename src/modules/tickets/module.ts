@@ -15,6 +15,7 @@ import { AccountsModule } from "../accounts/accounts.module";
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
 import { AccountsAuthGuard } from "@/shared/guards/accounts-auth.guard";
 import { UtilsModule } from "@/utils/utils.module";
+import { IncidentReportsModule } from "@/modules/incident-reports/incident-reports.module";
 
 @Module({
 	imports: [
@@ -26,6 +27,7 @@ import { UtilsModule } from "@/utils/utils.module";
 		AccountsModule,
 		SubscriptionsModule,
 		UtilsModule,
+		IncidentReportsModule,
 	],
 	providers: [
 		TicketsService,

@@ -23,6 +23,7 @@ export class StartupSeederService implements OnModuleInit {
 		try {
 			this.logger.log("Running startup seeder...");
 			await this.ensureTokenVersionColumns();
+			await this.ensureIncidentReportsTable();
 			await this.ensureUserPasswordResetsTable();
 			await this.seedSuperAdmin();
 			await this.seedSubscriptionPlans();
@@ -47,6 +48,46 @@ export class StartupSeederService implements OnModuleInit {
 		await this.dataSource.query(`
 			ALTER TABLE "users"
 			ADD COLUMN IF NOT EXISTS "must_change_password" boolean NOT NULL DEFAULT false
+		`);
+		await this.dataSource.query(`
+			ALTER TABLE "accounts"
+			ADD COLUMN IF NOT EXISTS "must_change_password" boolean NOT NULL DEFAULT false
+		`);
+	}
+
+	private async ensureIncidentReportsTable() {
+		await this.dataSource.query(`
+			CREATE TABLE IF NOT EXISTS "incident_reports" (
+				"id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+				"created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+				"updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+				"reference" character varying NOT NULL,
+				"account_id" uuid NOT NULL,
+				"status" character varying NOT NULL DEFAULT 'OPEN',
+				"severity" character varying NOT NULL,
+				"incident_type" character varying NOT NULL,
+				"ongoing" character varying NOT NULL,
+				"name" character varying NOT NULL,
+				"organization" character varying NOT NULL,
+				"phone" character varying NOT NULL,
+				"email" character varying NOT NULL,
+				"detected_at" character varying,
+				"affected_systems" text,
+				"description" text NOT NULL,
+				"assigned_agent_id" uuid,
+				"ticket_id" character varying,
+				"created_by_staff_id" uuid,
+				CONSTRAINT "PK_incident_reports" PRIMARY KEY ("id"),
+				CONSTRAINT "UQ_incident_reports_reference" UNIQUE ("reference")
+			)
+		`);
+		await this.dataSource.query(`
+			CREATE INDEX IF NOT EXISTS "IDX_incident_reports_account"
+			ON "incident_reports" ("account_id")
+		`);
+		await this.dataSource.query(`
+			CREATE INDEX IF NOT EXISTS "IDX_incident_reports_ticket"
+			ON "incident_reports" ("ticket_id")
 		`);
 	}
 

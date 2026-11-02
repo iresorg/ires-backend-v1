@@ -2,9 +2,11 @@ import {
 	BadRequestException,
 	ConflictException,
 	Injectable,
+	InternalServerErrorException,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { AccountsRepository } from "../repository/accounts.repository";
+import { Account } from "../entities/account.entity";
 import { Utils } from "@/utils/utils";
 import { EmailService } from "@/shared/email/service";
 import { FileUploadService } from "../../file-upload/service";
@@ -140,7 +142,10 @@ export class AccountsService {
 			aud: "portal",
 			tv: account.tokenVersion ?? 0,
 		});
-		return { token };
+		return {
+			token,
+			mustChangePassword: account.mustChangePassword ?? false,
+		};
 	}
 
 	private generateOtp(length: number = 6) {
@@ -201,6 +206,7 @@ export class AccountsService {
 			emailVerifiedAt: account.emailVerifiedAt,
 			lastLoginAt: account.lastLogin,
 			createdAt: account.createdAt,
+			mustChangePassword: account.mustChangePassword ?? false,
 		};
 
 		// Add individual profile if exists
@@ -440,9 +446,70 @@ export class AccountsService {
 
 		const passwordHash = await this.utils.createHash(dto.newPassword);
 		await this.repo.updatePassword(accountId, passwordHash);
+		await this.repo.setMustChangePassword(accountId, false);
 		await this.repo.incrementTokenVersion(accountId);
+		const updated = await this.repo.findById(accountId);
 
-		return { message: "Password changed successfully" };
+		const token = this.utils.generateJWT({
+			id: account.id,
+			email: account.email,
+			role: account.role,
+			aud: "portal",
+			tv: updated?.tokenVersion ?? (account.tokenVersion ?? 0) + 1,
+		});
+
+		return {
+			message: "Password changed successfully",
+			mustChangePassword: false,
+			token,
+		};
+	}
+
+	async provisionIndividualForIncident(input: {
+		email: string;
+		name: string;
+		phone: string;
+	}): Promise<{ account: Account; created: boolean }> {
+		const existing = await this.repo.findByEmail(input.email);
+		if (existing) {
+			return { account: existing, created: false };
+		}
+
+		const password = this.utils.generatePassword(8);
+		const [firstName, ...rest] = input.name.trim().split(/\s+/);
+		const lastName = rest.join(" ") || firstName;
+		const account = await this.repo.createAccount({
+			email: input.email.trim().toLowerCase(),
+			passwordHash: await this.utils.createHash(password),
+			role: "individual",
+			status: "active",
+			emailVerifiedAt: new Date(),
+			mustChangePassword: true,
+		});
+		await this.repo.createIndividualProfile({
+			firstName,
+			lastName,
+			phoneNumber: input.phone,
+			account: { id: account.id } as Account,
+		});
+
+		const loginUrl = process.env.PUBLIC_FRONTEND_URL
+			? `${process.env.PUBLIC_FRONTEND_URL.replace(/\/$/, "")}/login`
+			: undefined;
+		try {
+			await this.emailService.sendIncidentAccountEmail({
+				email: account.email,
+				name: firstName,
+				password,
+				loginUrl,
+			});
+		} catch {
+			throw new InternalServerErrorException(
+				"Could not send the new password email.",
+			);
+		}
+
+		return { account, created: true };
 	}
 
 	async logout(accountId: string) {

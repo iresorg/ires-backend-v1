@@ -16,6 +16,7 @@ import { OrganizationProfile } from "@/modules/accounts/entities/organization-pr
 import { AccountEmailVerification } from "@/modules/accounts/entities/email-verification.entity";
 import { AccountPasswordReset } from "@/modules/accounts/entities/password-reset.entity";
 import { UserPasswordReset } from "@/modules/auth/entities/user-password-reset.entity";
+import { IncidentReport } from "@/modules/incident-reports/entities/incident-report.entity";
 import { Subscription } from "@/modules/subscriptions/entities/subscription.entity";
 import { SubscriptionPlan } from "@/modules/subscriptions/entities/subscription-plan.entity";
 import { PaystackEvent } from "@/modules/subscriptions/entities/paystack-event.entity";
@@ -48,6 +49,7 @@ export function createDataSourceOptions(
 			AccountEmailVerification,
 			AccountPasswordReset,
 			UserPasswordReset,
+			IncidentReport,
 			// Subscriptions module entities
 			Subscription,
 			SubscriptionPlan,

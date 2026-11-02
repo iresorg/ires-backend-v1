@@ -31,6 +31,8 @@ import { IncidentCreditsRepository } from "@/modules/subscriptions/repository/in
 import { TicketEntitlementSource } from "./entities/ticket.entity";
 import { Account } from "@/modules/accounts/entities/account.entity";
 import { IUser } from "@/modules/users/interfaces/user.interface";
+import { IncidentReportsService } from "@/modules/incident-reports/incident-reports.service";
+import { buildPaginationResult } from "@/shared/utils/pagination.util";
 
 export type TicketEligibility = {
 	eligible: boolean;
@@ -79,6 +81,7 @@ export class TicketsService {
 		private readonly accountsRepo: AccountsRepository,
 		private readonly subscriptionsRepo: SubscriptionsRepository,
 		private readonly incidentCreditsRepo: IncidentCreditsRepository,
+		private readonly incidentReports: IncidentReportsService,
 	) {}
 
 	async getAccountEligibility(accountId: string): Promise<TicketEligibility> {
@@ -279,6 +282,7 @@ export class TicketsService {
 			victimInformation?: ITicketCreate["victimInformation"];
 			attachments?: string[];
 			type?: string;
+			incidentId?: string;
 		},
 		attachments?: Express.Multer.File[],
 	): Promise<ITicket> {
@@ -390,6 +394,14 @@ export class TicketsService {
 				TicketStatus.CREATED,
 				"Your incident ticket has been created",
 				"We have opened a ticket for your incident. Our team will review it shortly.",
+			);
+		}
+
+		if (body.incidentId) {
+			await this.incidentReports.linkTicket(
+				body.incidentId,
+				ticketId,
+				body.accountId,
 			);
 		}
 
@@ -686,6 +698,33 @@ export class TicketsService {
 		}
 	}
 
+	async getQueue(query: PaginationQuery) {
+		const page = query.page ?? 1;
+		const limit = query.limit ?? 10;
+		const { rows, total } = await this.ticketsRepository.getUnassignedQueue(
+			page,
+			limit,
+		);
+		const linked = await this.incidentReports.referencesForTickets(
+			rows.map((ticket) => ticket.ticketId),
+		);
+		const data = rows.map((ticket) => ({
+			ticketId: ticket.ticketId,
+			title: ticket.title,
+			status: ticket.status,
+			createdAt: ticket.createdAt,
+			account: ticket.createdFor
+				? {
+						id: ticket.createdFor.id,
+						email: ticket.createdFor.email,
+						name: this.accountDisplayName(ticket.createdFor),
+					}
+				: null,
+			incident: linked.get(ticket.ticketId) ?? null,
+		}));
+		return buildPaginationResult(data, total, { page, limit });
+	}
+
 	async closeTicket(ticketId: string, performerById: string, notes?: string) {
 		await this.getTicketById(ticketId);
 		await this.databaseService.withTransaction(async (trx) => {
@@ -698,6 +737,7 @@ export class TicketsService {
 			);
 		});
 
+		await this.incidentReports.closeByTicketId(ticketId);
 		const updated = await this.getTicketById(ticketId);
 		await this.notifyCustomerStatus(
 			updated,
