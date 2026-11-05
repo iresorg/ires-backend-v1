@@ -321,6 +321,35 @@ Detail `200`: `{ "message": "Incident fetched", "incident": {} }`
 
 Update `200`: `{ "message": "Incident updated", "incident": {} }`
 
+### People who can be assigned
+
+```http
+GET /api/v1/incident-reports/assignees
+GET /api/v1/incident-reports/assignees?search=ada
+```
+
+Auth: staff token. Roles: `SUPER_ADMIN`, `ADMIN`, `AGENT_ADMIN`.
+
+Returns active users whose role is `AGENT` or `AGENT_ADMIN`. `search` matches first name, last name, or email. `GET /api/v1/users?role=AGENT` does not include agent admins.
+
+`200`
+
+```json
+{
+  "message": "Assignees fetched",
+  "data": [
+    {
+      "id": "staff-user-uuid",
+      "firstName": "Islam",
+      "lastName": "Adesina",
+      "email": "islam@example.com",
+      "role": "AGENT_ADMIN",
+      "status": "active"
+    }
+  ]
+}
+```
+
 ### Assign an agent
 
 ```http
@@ -331,7 +360,7 @@ PATCH /api/v1/incident-reports/:id/assign
 { "agentId": "staff-user-uuid" }
 ```
 
-`agentId` must be a user with role `AGENT`. The incident stays `OPEN`.
+`agentId` must be an active user with role `AGENT` or `AGENT_ADMIN`. An agent admin assigns the incident to themselves by sending their own user id. The incident stays `OPEN`.
 
 `200`
 
@@ -344,7 +373,7 @@ PATCH /api/v1/incident-reports/:id/assign
 
 The agent email subject is `Incident assigned to you — {reference}`. The body has reference, severity, type, organization, and the customer email.
 
-`400` `agentId must be an agent`
+`400` `agentId must be an active agent or agent admin`
 
 `500` `Could not send the assignment email.`
 
@@ -433,7 +462,7 @@ Rows are tickets in `CREATED` or `PENDING` with no assigned responder.
 
 | Status | Message |
 |---|---|
-| `400` | Invalid field, or `agentId must be an agent`, or `Ticket customer does not match the incident` |
+| `400` | Invalid field, or `agentId must be an active agent or agent admin`, or `Ticket customer does not match the incident` |
 | `401` | Missing or invalid token |
 | `403` | `You do not have access to this incident` or the role is not allowed |
 | `404` | `Incident not found` or `Ticket not found` |
