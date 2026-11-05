@@ -28,6 +28,18 @@ export class IncidentReportsRepository {
 		});
 	}
 
+	/** Resolve by UUID or public reference (`IR-YYYYMMDD-XXXXXX`). */
+	async findByIdOrReference(idOrReference: string): Promise<IncidentReport | null> {
+		const key = idOrReference.trim();
+		if (!key) return null;
+		const byId = await this.findById(key);
+		if (byId) return byId;
+		return this.incidents.findOne({
+			where: { reference: key },
+			relations: ["account", "assignedAgent"],
+		});
+	}
+
 	async search(filter: {
 		accountId?: string;
 		assignedAgentId?: string;

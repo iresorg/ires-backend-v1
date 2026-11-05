@@ -315,6 +315,8 @@ GET /api/v1/incident-reports/:id
 PATCH /api/v1/incident-reports/:id
 ```
 
+`:id` accepts the incident UUID or the public reference (`IR-YYYYMMDD-XXXXXX`).
+
 Staff may also send `severity` and `incidentType` on the patch. Same `409` when the incident or its ticket is closed.
 
 Detail `200`: `{ "message": "Incident fetched", "incident": {} }`
