@@ -355,7 +355,7 @@ export class IncidentReportsService {
 	}
 
 	private async requireIncident(id: string): Promise<IncidentReport> {
-		const incident = await this.repo.findById(id);
+		const incident = await this.repo.findByIdOrReference(id);
 		if (!incident) throw new NotFoundException("Incident not found");
 		return incident;
 	}
