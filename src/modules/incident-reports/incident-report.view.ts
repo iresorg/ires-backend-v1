@@ -9,6 +9,7 @@ export type IncidentView = {
 	incidentType: string;
 	ongoing: string;
 	name: string;
+	reportName: string;
 	organization: string | null;
 	phone: string;
 	email: string;
@@ -41,6 +42,7 @@ export function toIncidentView(
 		incidentType: incident.incidentType,
 		ongoing: incident.ongoing,
 		name: incident.name,
+		reportName: incident.name,
 		organization: incident.organization ?? null,
 		phone: incident.phone,
 		email: incident.email,

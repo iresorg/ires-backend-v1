@@ -154,6 +154,8 @@ export class IncidentReportsService {
 			limit?: number;
 			status?: "OPEN" | "CLOSED";
 			assigned?: boolean;
+			accountId?: string;
+			unlinked?: boolean;
 		},
 	) {
 		const page = query.page ?? 1;
@@ -163,6 +165,8 @@ export class IncidentReportsService {
 			page,
 			limit,
 			status: query.status,
+			accountId: query.accountId,
+			unlinked: query.unlinked,
 			assignedAgentId: agentOnly ? caller.id : undefined,
 			assigned: agentOnly ? undefined : query.assigned,
 		});

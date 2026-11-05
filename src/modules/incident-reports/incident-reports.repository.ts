@@ -4,6 +4,13 @@ import { In, Repository } from "typeorm";
 import { IncidentReport, IncidentStatus } from "./entities/incident-report.entity";
 import { Tickets } from "@/modules/tickets/entities/ticket.entity";
 
+const UUID_PATTERN =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+	return UUID_PATTERN.test(value);
+}
+
 @Injectable()
 export class IncidentReportsRepository {
 	constructor(
@@ -32,8 +39,7 @@ export class IncidentReportsRepository {
 	async findByIdOrReference(idOrReference: string): Promise<IncidentReport | null> {
 		const key = idOrReference.trim();
 		if (!key) return null;
-		const byId = await this.findById(key);
-		if (byId) return byId;
+		if (isUuid(key)) return this.findById(key);
 		return this.incidents.findOne({
 			where: { reference: key },
 			relations: ["account", "assignedAgent"],
@@ -45,6 +51,7 @@ export class IncidentReportsRepository {
 		assignedAgentId?: string;
 		assigned?: boolean;
 		status?: IncidentStatus;
+		unlinked?: boolean;
 		page: number;
 		limit: number;
 	}): Promise<{ rows: IncidentReport[]; total: number }> {
@@ -74,6 +81,12 @@ export class IncidentReportsRepository {
 		}
 		if (filter.status) {
 			qb.andWhere("incident.status = :status", { status: filter.status });
+		}
+		if (filter.unlinked === true) {
+			qb.andWhere("incident.ticketId IS NULL");
+		}
+		if (filter.unlinked === false) {
+			qb.andWhere("incident.ticketId IS NOT NULL");
 		}
 
 		const [rows, total] = await qb.getManyAndCount();

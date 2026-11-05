@@ -82,7 +82,8 @@ List rows and the detail `incident` object use the same fields.
 | `severity` | string | `Critical` \| `High` \| `Medium` \| `Low` |
 | `incidentType` | string | Free text, max 200 |
 | `ongoing` | string | `Yes` \| `No` \| `Not sure` |
-| `name` | string | |
+| `name` | string | Reporter name |
+| `reportName` | string | Same value as `name`, for the report title |
 | `organization` | string or null | Optional on create |
 | `phone` | string | |
 | `email` | string | Email on the report |
@@ -302,9 +303,12 @@ Auth: staff token.
 GET /api/v1/incident-reports/queue?page=1&limit=10
 GET /api/v1/incident-reports/queue?status=OPEN
 GET /api/v1/incident-reports/queue?assigned=false
+GET /api/v1/incident-reports/queue?accountId=<uuid>&status=OPEN&unlinked=true
 ```
 
 `assigned=false` is the unassigned queue. `assigned=true` is incidents that already have an agent. Agents always see only their own rows; `assigned` is ignored for them.
+
+`accountId` limits rows to that customer. `unlinked=true` returns incidents with no ticket (for the create-ticket picker).
 
 `200` with `message: "Incidents fetched"` and the pagination fields. Each item includes `createdByStaffId`.
 
