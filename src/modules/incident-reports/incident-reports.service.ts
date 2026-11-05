@@ -130,6 +130,23 @@ export class IncidentReportsService {
 		return { incident: await this.oneView(await this.requireIncident(id), false) };
 	}
 
+	async listAssignees(search?: string) {
+		const users = await this.usersService.findByRoles([
+			Role.AGENT,
+			Role.AGENT_ADMIN,
+		]);
+		const needle = search?.trim().toLowerCase();
+		const active = users.filter((user) => {
+			if (user.status !== "active") return false;
+			if (!needle) return true;
+			const name = `${user.firstName} ${user.lastName}`.toLowerCase();
+			return (
+				name.includes(needle) || user.email.toLowerCase().includes(needle)
+			);
+		});
+		return active;
+	}
+
 	async queue(
 		caller: { id: string; role: Role },
 		query: {
@@ -181,8 +198,12 @@ export class IncidentReportsService {
 		const incident = await this.requireIncident(id);
 		await this.assertOpen(incident);
 		const agent = await this.usersService.findOne({ id: agentId });
-		if (!agent || agent.role !== Role.AGENT) {
-			throw new BadRequestException("agentId must be an agent");
+		const canMonitor =
+			agent?.role === Role.AGENT || agent?.role === Role.AGENT_ADMIN;
+		if (!agent || !canMonitor || agent.status !== "active") {
+			throw new BadRequestException(
+				"agentId must be an active agent or agent admin",
+			);
 		}
 		incident.assignedAgent = { id: agent.id } as User;
 		await this.repo.save(incident);

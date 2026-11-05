@@ -17,6 +17,7 @@ import { RoleGuard } from "@/shared/guards/roles.guard";
 import { Roles } from "@/shared/decorators/role.decorator";
 import { Role } from "@/modules/users/enums/role.enum";
 import { AuthRequest } from "@/shared/interfaces/request.interface";
+import { UserResponseDto } from "@/modules/users/dto/user-response.dto";
 import { CreateIncidentReportDto } from "./dto/create-incident-report.dto";
 import { IncidentQueueQuery } from "./dto/incident-queue-query.dto";
 import { UpdateStaffIncidentDto } from "./dto/update-incident-report.dto";
@@ -73,6 +74,20 @@ export class IncidentReportsController {
 		return await this.incidentReports.submitForStaff(body, req.user.id);
 	}
 
+	@Get("assignees")
+	@UseGuards(AuthGuard, RoleGuard)
+	@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.AGENT_ADMIN)
+	@ApiOperation({
+		summary: "Active agents and agent admins who can monitor an incident",
+	})
+	async assignees(@Query("search") search?: string) {
+		const users = await this.incidentReports.listAssignees(search);
+		return {
+			message: "Assignees fetched",
+			data: UserResponseDto.fromUsers(users),
+		};
+	}
+
 	@Get("queue")
 	@UseGuards(AuthGuard, RoleGuard)
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.AGENT_ADMIN, Role.AGENT)
@@ -117,7 +132,11 @@ export class IncidentReportsController {
 	@Patch(":id/assign")
 	@UseGuards(AuthGuard, RoleGuard)
 	@Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.AGENT_ADMIN)
-	@ApiOperation({ summary: "Assign an agent to monitor an incident" })
+	@ApiOperation({
+		summary: "Assign an agent or agent admin to monitor an incident",
+		description:
+			"An agent admin can pass their own user id to assign the incident to themselves.",
+	})
 	async assign(
 		@Param("id") id: string,
 		@Body() body: AssignIncidentDto,
